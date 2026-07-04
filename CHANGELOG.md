@@ -6,6 +6,13 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.4.0] - 2026-07-04
+
+### Added
+- Block-based terminal renderer (in progress on feature/block-renderer): rendering now flows through
+  a semantic Block AST (styled lines → typed blocks → React components); this release contains the
+  raw-block foundation — visually identical, groundwork for native prompt/tool-call rendering.
+
 ## [0.3.0] - 2026-07-03
 
 A full-codebase review pass: four audit agents (backend, frontend, security, ops/product) swept the
