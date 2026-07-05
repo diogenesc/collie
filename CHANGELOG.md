@@ -6,6 +6,22 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.4.1] - 2026-07-05
+
+### Added
+- **Preview-variant question notes.** Claude Code's *preview* AskUserQuestion — a single-select
+  question whose options carry a `preview` field (the mockup/snippet pane, footer hint
+  `n to add notes`) — is lifted into a native block that surfaces the per-question note affordance.
+  A note (attach / edit / remove) is driven from the native option UI and applies **per question**,
+  not per option row. Delivery uses the verified staged keystroke choreography
+  (`n` → confirm the input focused → clear → paste the text via the reply path → `Escape` to blur,
+  each stage verified rendered before the next fires; `Enter` is never sent, since it would submit
+  the dialog — see `web/src/lib/grammar/NOTES_NOTES.md`), and option selection is the two-step
+  digit → verify-pointer → `Enter` recipe. Race-guarded like the other dialog blocks (a stale tap on
+  a drifted dialog aborts before anything irreversible is sent). Claude-scoped (`hasBlockGrammar`)
+  and web-only; the standard non-preview select and wizard steps are unaffected (pressing `n` there
+  is a no-op, so no notes UI is shown).
+
 ## [0.4.0] - 2026-07-05
 
 ### Added

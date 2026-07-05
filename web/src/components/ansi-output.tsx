@@ -7,6 +7,7 @@ import {
   buildBlocks,
   splitLines,
   type Block,
+  type PreviewSelectModel,
   type PromptModel,
   type PromptOption,
   type WizardModel,
@@ -15,6 +16,7 @@ import { lineText } from "@/lib/grammar/markers";
 import { findMatches, splitSegment, type FindMatch } from "@/lib/find";
 import { PromptSelectBlock } from "@/components/prompt-select-block";
 import { WizardBlock } from "@/components/wizard-block";
+import { PreviewSelectBlock, type PreviewBlockAction } from "@/components/preview-select-block";
 
 /** A raw block, narrowed off the Block union (the highlight/offset paths only touch these). */
 type RawBlock = Extract<Block, { kind: "raw" }>;
@@ -22,6 +24,8 @@ type RawBlock = Extract<Block, { kind: "raw" }>;
 type PromptBlock = Extract<Block, { kind: "prompt-select" }>;
 /** The (at most one) wizard block — always at the tail, mutually exclusive with prompt-select. */
 type WizBlock = Extract<Block, { kind: "wizard" }>;
+/** The (at most one) preview-select block — tail, mutually exclusive with the other two. */
+type PrevBlock = Extract<Block, { kind: "preview-select" }>;
 
 export interface AnsiOutputProps {
   text: string;
@@ -45,7 +49,10 @@ export interface AnsiOutputProps {
   /** Injected handler for a wizard tap — one race-guarded keystroke per control (see
    *  lib/wizard-action.ts). Same presentational contract as onPromptAction. */
   onWizardAction?: (keys: string[], wizard: WizardModel) => void | Promise<void>;
-  /** Disable the prompt-select/wizard buttons (read-only device / gone pane). */
+  /** Injected handler for a preview-dialog tap (option / note / step-nav intents — the race-guarded
+   *  choreography lives in lib/preview-action.ts). Same presentational contract as onPromptAction. */
+  onPreviewAction?: (action: PreviewBlockAction, preview: PreviewSelectModel) => void | Promise<void>;
+  /** Disable the prompt-select/wizard/preview buttons (read-only device / gone pane). */
   promptDisabled?: boolean;
 }
 
@@ -90,6 +97,7 @@ export const AnsiOutput = memo(function AnsiOutput({
   agent,
   onPromptAction,
   onWizardAction,
+  onPreviewAction,
   promptDisabled,
 }: AnsiOutputProps) {
   const segments = useMemo(() => parseAnsi(text), [text]);
@@ -105,6 +113,10 @@ export const AnsiOutput = memo(function AnsiOutput({
   );
   const wizardBlock = useMemo(
     () => blocks.find((b): b is WizBlock => b.kind === "wizard") ?? null,
+    [blocks],
+  );
+  const previewBlock = useMemo(
+    () => blocks.find((b): b is PrevBlock => b.kind === "preview-select") ?? null,
     [blocks],
   );
 
@@ -143,6 +155,12 @@ export const AnsiOutput = memo(function AnsiOutput({
       wizard={wizardBlock.wizard}
       disabled={promptDisabled || !onWizardAction}
       onAction={(keys) => onWizardAction?.(keys, wizardBlock.wizard)}
+    />
+  ) : previewBlock ? (
+    <PreviewSelectBlock
+      preview={previewBlock.preview}
+      disabled={promptDisabled || !onPreviewAction}
+      onAction={(action) => onPreviewAction?.(action, previewBlock.preview)}
     />
   ) : null;
 

@@ -40,6 +40,21 @@ pane over capturing real work sessions.
 | `claude--wizard-submit.txt` | Submit review step, all answered: `● question / → answer` pairs, `❯ 1. Submit answers / 2. Cancel` — **no hint footer** (the tail anchor differs from every other dialog) |
 | `claude--wizard-submit-unanswered.txt` | Review reached by Right-skipping unanswered questions: `⚠ You have not answered all questions`, submit still offered |
 
+## Preview-variant corpus (captured 2026-07-05, sandbox pane; choreography in `../../lib/grammar/NOTES_NOTES.md`)
+
+The PREVIEW variant of AskUserQuestion (`!multiSelect` + ≥1 option with a `preview` field): a
+fixed-width option column, the pointed option's preview pane on the right, and the per-question
+**notes** affordance (`n to add notes` in the footer). Detected by `grammar/preview-select.ts`;
+deliberately NOT matched by prompt-select or the wizard grammar.
+
+| Fixture | State / what's in it |
+|---|---|
+| `claude--select-preview.txt` | Single preview question, pointer on row 1, `Notes: press n to add notes` hint |
+| `claude--select-preview-note-input.txt` | Note input **focused**: placeholder `Add notes on this design…`, footer gains `ctrl+g to edit in nano` |
+| `claude--select-preview-note-attached.txt` | Committed note (`Notes: prefer subtle shadows`), input blurred |
+| `claude--wizard-preview-q1.txt` | 2-question wizard whose Q1 is a preview step: stepper header above the preview layout |
+| `claude--wizard-preview-note-attached.txt` | Same wizard step with a note attached |
+
 All sandbox-generated (a scratch pane driven through the bridge) except `claude--working.txt`,
 which is a real pane working on this repo. Every `blocked` fixture's menu sits at the **buffer
 tail** — the invariant T2's detector leans on.
