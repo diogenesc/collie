@@ -71,6 +71,11 @@ against a real pane). Empirically enumerated against Herdr 0.7.0 — it is **NOT
 
 `agent_status` ∈ `idle | working | blocked | done | unknown`. Panes without an agent omit/null `agent`.
 
+> **`revision` is a stub on Herdr 0.7.x** (live-verified 2026-07-05): `pane.read` and `pane.list`
+> return `revision: 0` for every pane, including actively-changing ones. Treat it as advisory /
+> future-proofing only — never as a load-bearing change detector (Collie's prompt-select race
+> guard re-derives the menu from content for exactly this reason).
+
 ## Event stream (available; NOT used by the MVP)
 
 `events.subscribe` `{subscriptions: [{type, …}]}` keeps the connection open and streams events.

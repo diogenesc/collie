@@ -155,11 +155,13 @@ describe("submitPromptOption — race guard + per-family keystroke recipe", () =
     expect(mockSendKeys).not.toHaveBeenCalled();
   });
 
-  it("passes on a 304 whose revision still matches (only the re-derivation is skipped)", async () => {
+  it("passes on a 304 whose revision matches AND whose cached text re-derives the same menu", async () => {
+    // fetchPane's 304 path returns the cached body (text included), so the re-derivation — which
+    // now runs on EVERY path because Herdr 0.7.x's revision is a stub — sees the full buffer.
     const model = fixtureModel("claude--permission-bash.txt");
     mockFetchPane.mockResolvedValue({
       paneId: "w1:p1",
-      text: "",
+      text: fixtureText("claude--permission-bash.txt"),
       truncated: false,
       revision: 42, // the cached body's revision — matches what the menu was detected against
       notModified: true,
@@ -173,6 +175,29 @@ describe("submitPromptOption — race guard + per-family keystroke recipe", () =
     });
     expect(res).toEqual({ status: "sent" });
     expect(mockSendKeys).toHaveBeenCalledWith("w1:p1", ["2"]);
+  });
+
+  it("rejects a 304 with MATCHING (stub) revisions when the cached text no longer shows the menu", async () => {
+    // The live hole found on 2026-07-05: Herdr 0.7.x returns revision 0 for every read, so the
+    // revision gate is inert — a frozen tap whose confirm-fetch 304s against an advanced cache
+    // must still be caught by re-deriving the menu from the cached (= latest) text.
+    const model = fixtureModel("claude--permission-bash.txt");
+    mockFetchPane.mockResolvedValue({
+      paneId: "w1:p1",
+      text: fixtureText("claude--done.txt"), // menu is long gone; agent moved on
+      truncated: false,
+      revision: 0, // stub revision — matches detectedRevision, provides no protection
+      notModified: true,
+    });
+    const res = await submitPromptOption({
+      paneId: "w1:p1",
+      requestedLines: 600,
+      detectedRevision: 0,
+      prompt: model,
+      option: model.options[1]!,
+    });
+    expect(res).toEqual({ status: "changed" });
+    expect(mockSendKeys).not.toHaveBeenCalled();
   });
 
   it("rejects a 304 whose revision differs — 'not modified' only means unchanged since the LAST POLL", async () => {

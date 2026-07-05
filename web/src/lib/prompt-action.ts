@@ -9,9 +9,9 @@
 //      cache's LAST background poll, NOT since the (possibly frozen) snapshot the user tapped on —
 //      the cache advances with every poll while a frozen mirror stands still. The cached 304 body
 //      carries its own `revision`, so the comparison works on both paths.
-//   3. Unless the read was a 304 (content byte-identical to the last poll, and the revision already
-//      matched), the fresh buffer must additionally still re-derive to the same {question, options}
-//      (family + labels).
+//   3. The fresh buffer must additionally still re-derive to the same {question, options}
+//      (family + labels) — on EVERY path, 304 included, because Herdr 0.7.x's revision field is
+//      empirically a stub (always 0) and the re-derivation is the only load-bearing check today.
 //
 // Only then do we send the option's keys through the existing sendKeys write path. A failed guard
 // discards the tap and reports "changed" so the caller can surface a "menu changed" notice.
@@ -62,12 +62,13 @@ export async function submitPromptOption(args: {
   // keep advancing the ETag cache under a frozen mirror — it does NOT vouch for the snapshot the
   // user actually tapped on. The cached 304 body carries its revision, so this covers both paths.
   if (fresh.revision !== detectedRevision) return { status: "changed" };
-  // Same revision + 304 ⇒ the content is what the last poll saw and hasn't moved — only then can
-  // the parse + detect + equality re-derivation be skipped.
-  if (fresh.notModified !== true) {
-    const freshModel = detectPromptSelect(splitLines(parseAnsi(fresh.text)));
-    if (!freshModel || !promptsEqual(freshModel, prompt)) return { status: "changed" };
-  }
+  // EMPIRICAL (Herdr 0.7.x, live-verified 2026-07-05): pane.read's `revision` is a stub upstream —
+  // it is always 0, even for actively-changing panes. The gate above is therefore defense-in-depth
+  // for future Herdr versions, NOT load-bearing. So the menu re-derivation below runs on EVERY
+  // path, including 304: the fresh (= latest cached) text is exactly what a tap on a possibly
+  // frozen mirror must be compared against. One parse per tap — taps are rare, correctness isn't.
+  const freshModel = detectPromptSelect(splitLines(parseAnsi(fresh.text)));
+  if (!freshModel || !promptsEqual(freshModel, prompt)) return { status: "changed" };
 
   try {
     const res = await sendKeys(paneId, option.keys);
