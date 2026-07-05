@@ -20,14 +20,17 @@ import type { PromptModel } from "./grammar/prompt-select";
 import { detectPromptSelectRegion } from "./grammar/prompt-select";
 import type { WizardModel } from "./grammar/wizard";
 import { detectWizardRegion } from "./grammar/wizard";
+import type { PreviewSelectModel } from "./grammar/preview-select";
+import { detectPreviewSelectRegion } from "./grammar/preview-select";
 import { stripChrome } from "./grammar/chrome";
 import { hasBlockGrammar } from "./grammar/agents";
 import { isBlank, lineText } from "./grammar/markers";
 
-// Re-export the prompt-select + wizard models so consumers (the block components, the race guards)
-// have one import site for the AST's typed payloads.
+// Re-export the prompt-select + wizard + preview models so consumers (the block components, the
+// race guards) have one import site for the AST's typed payloads.
 export type { PromptModel, PromptOption, PromptFamily } from "./grammar/prompt-select";
 export type { WizardModel, WizardOption, WizardStepChip, WizardAnswer } from "./grammar/wizard";
+export type { PreviewSelectModel, PreviewOption, PreviewNote } from "./grammar/preview-select";
 
 /** One visual line: the styled segments that make it up, with the line-terminating "\n" removed. */
 export interface StyledLine {
@@ -64,10 +67,21 @@ export interface WizardBlock {
 }
 
 /**
+ * A preview-variant AskUserQuestion (options + preview pane + the per-question note affordance;
+ * grammar/NOTES_NOTES.md) lifted out of the raw mirror. Like the other dialog blocks it REPLACES
+ * its region in place; `lines` is provenance only — not rendered, not searchable.
+ */
+export interface PreviewSelectBlock {
+  kind: "preview-select";
+  preview: PreviewSelectModel;
+  lines: StyledLine[];
+}
+
+/**
  * A semantic block. A discriminated union on `kind`; new members are added purely additively, so a
  * `switch (block.kind)` in the renderer stays exhaustive.
  */
-export type Block = RawBlock | PromptSelectBlock | WizardBlock;
+export type Block = RawBlock | PromptSelectBlock | WizardBlock | PreviewSelectBlock;
 
 /**
  * Split parsed segments into visual lines at "\n" boundaries. The newline characters become the
@@ -127,9 +141,25 @@ export function buildBlocks(lines: StyledLine[], ctx?: { agent?: string }): Bloc
   // can't drift from agent-chat's status-strip gate. Every other agent keeps the pure raw mirror.
   if (!hasBlockGrammar(ctx?.agent)) return [{ kind: "raw", lines }];
 
-  // The wizard runs FIRST: its question phase also carries a select footer, so prompt-select's
-  // detector would otherwise have to arbitrate (today it bails on the stepper header — that bail
-  // stays as a safety net for a wizard this detector misses).
+  // The preview variant runs FIRST: its footer is the most specific anchor ("n to add notes"),
+  // and although the wizard/prompt-select detectors can't match its layout (their footer-gap
+  // guards fail on the tall preview pane), ordering by specificity keeps the arbitration obvious.
+  const previewRegion = detectPreviewSelectRegion(lines);
+  if (previewRegion) {
+    const before = trimTrailingBlank(lines.slice(0, previewRegion.startLine));
+    const blocks: Block[] = [];
+    if (before.length > 0) blocks.push({ kind: "raw", lines: before });
+    blocks.push({
+      kind: "preview-select",
+      preview: previewRegion.model,
+      lines: lines.slice(previewRegion.startLine),
+    });
+    return blocks;
+  }
+
+  // The wizard runs before prompt-select: its question phase also carries a select footer, so
+  // prompt-select's detector would otherwise have to arbitrate (today it bails on the stepper
+  // header — that bail stays as a safety net for a wizard this detector misses).
   const wizardRegion = detectWizardRegion(lines);
   if (wizardRegion) {
     const before = trimTrailingBlank(lines.slice(0, wizardRegion.startLine));

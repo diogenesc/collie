@@ -26,12 +26,14 @@ import { ShellBadge, StatusBadge } from "@/components/status-badge";
 import * as api from "@/lib/api";
 import { submitPromptOption } from "@/lib/prompt-action";
 import { submitWizardKeys } from "@/lib/wizard-action";
+import { submitPreviewKeys, submitPreviewNote, submitPreviewOption } from "@/lib/preview-action";
+import type { PreviewBlockAction } from "@/components/preview-select-block";
 import { canGrowRequestedLines, growRequestedLines } from "@/lib/loaders";
 import { shortCwd } from "@/lib/format";
 import { navigateWithTransition } from "@/lib/view-transition";
 import { isReadOnly } from "@/lib/types";
 import type { AgentView, DeviceAuth, TabView, WorkspaceView } from "@/lib/types";
-import type { PromptModel, PromptOption, WizardModel } from "@/lib/blocks";
+import type { PreviewSelectModel, PromptModel, PromptOption, WizardModel } from "@/lib/blocks";
 
 interface AgentChatProps {
   paneId: string;
@@ -296,6 +298,48 @@ export function AgentChat({
     [readOnly, paneId, requestedLines, shown.revision, revalidator],
   );
 
+  // Tap a preview-dialog control (an option, the note add/edit/remove, or the wizard step nav).
+  // Same guard-first shape as the two handlers above, but the choreography behind an intent is
+  // MULTI-step (digit→verify→Enter; n→verify→type→Escape — see lib/preview-action.ts and
+  // grammar/NOTES_NOTES.md), so the handler dispatches on the intent kind.
+  // gate: claude-only (see hasBlockGrammar) — preview blocks only ever exist for a Claude pane.
+  const handlePreviewAction = useCallback(
+    async (action: PreviewBlockAction, preview: PreviewSelectModel) => {
+      if (readOnly) {
+        setStatus("Read-only — device not authorised", "error");
+        return;
+      }
+      const base = {
+        paneId,
+        requestedLines,
+        detectedRevision: shown.revision,
+        preview,
+      };
+      const result =
+        action.kind === "option"
+          ? await submitPreviewOption({ ...base, option: action.option })
+          : action.kind === "note"
+            ? await submitPreviewNote({ ...base, text: action.text })
+            : await submitPreviewKeys({ ...base, keys: action.keys });
+      if (result.status === "sent") {
+        setStatus(
+          action.kind === "note" ? (action.text ? "Note saved" : "Note removed") : "Sent",
+          "success",
+        );
+        setFollowing(true);
+        revalidator.revalidate();
+        listRef.current?.scrollToBottom();
+      } else if (result.status === "changed") {
+        setStatus("Dialog changed — refreshing", "warn");
+        revalidator.revalidate();
+      } else {
+        setStatus(result.error || "Send failed", "error");
+        revalidator.revalidate();
+      }
+    },
+    [readOnly, paneId, requestedLines, shown.revision, revalidator],
+  );
+
   // NOTE: the composer is deliberately NOT auto-focused on open/switch — that would pop the Android
   // keyboard and cover the output. You read the pane first, then tap the input to type. (Explicit
   // actions inside the composer still focus it; the mirror tap focuses it via composerRef.)
@@ -488,6 +532,7 @@ export function AgentChat({
                 agent={grammarsOn ? agent?.agent : undefined}
                 onPromptAction={handlePromptAction}
                 onWizardAction={handleWizardAction}
+                onPreviewAction={handlePreviewAction}
                 promptDisabled={readOnly || gone}
               />
             </>
