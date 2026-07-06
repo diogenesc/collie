@@ -6,6 +6,15 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.7.0] - 2026-07-06
+
+### Added
+- Notification type prefs: Settings "Notify when" toggles per agent status, bridge-wide; default pushes only "Needs input" (blocked) — "Finished" (done) is off (98cf5d2)
+
+### Changed
+- Push sends carry a `collie-herd` topic + 6h TTL: an offline device now gets one current summary on reconnect instead of replaying every queued update (98cf5d2)
+- Disabling a notification kind retracts its pending/outstanding alerts immediately (98cf5d2)
+
 ## [0.6.0] - 2026-07-06
 
 ### Added
