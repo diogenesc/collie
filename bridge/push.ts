@@ -9,6 +9,15 @@ import type { Config } from "./config.ts";
 type WebPushModule = typeof import("web-push");
 export type PushSubscription = { endpoint: string; keys: { p256dh: string; auth: string } };
 
+// Delivery options passed to web-push on every send. Without them a message gets web-push's 4-week
+// default TTL and NO collapse key, so an offline device replays every queued herd update on reconnect.
+//   • `topic` is a collapse key — the push service keeps only the LATEST message per device with this
+//     topic, so a reconnecting phone gets one current summary instead of a burst of stale ones. Must
+//     match [A-Za-z0-9_-] and be ≤32 chars ("collie-herd" is valid).
+//   • `TTL` (seconds) bounds how long the service holds an undelivered message: 6h is long enough to
+//     reach a briefly-offline phone but short enough that a day-old "needs you" doesn't resurface.
+const SEND_OPTIONS = { TTL: 21_600, topic: "collie-herd" } as const;
+
 /** Delivers one payload to one subscription. Injectable so the prune/log logic is testable. */
 export type PushSender = (sub: PushSubscription, payload: string) => Promise<unknown>;
 
@@ -49,7 +58,7 @@ export class Push {
     sender?: PushSender,
   ) {
     this.file = join(cfg.stateDir, "push-subscriptions.json");
-    this.sender = sender ?? ((sub, payload) => this.lib!.sendNotification(sub, payload));
+    this.sender = sender ?? ((sub, payload) => this.lib!.sendNotification(sub, payload, SEND_OPTIONS));
   }
 
   /** Whether push is live (VAPID keys configured and `web-push` installed). Set once in init(). */

@@ -107,6 +107,17 @@ export interface BridgeConfig {
   build?: string;
 }
 
+/**
+ * Notification type preferences (GET/POST /api/notifications/prefs). Which agent statuses push, set
+ * bridge-wide (fans out to every device, like the snooze). Mirrors NotifyPrefs in bridge/notify-prefs.ts.
+ */
+export interface NotifyPrefs {
+  /** Push when an agent becomes blocked (waiting on your input). Default on. */
+  blocked: boolean;
+  /** Push when an agent finishes its task. Default off. */
+  done: boolean;
+}
+
 /** Lower sorts first — "needs you" at the top. Mirrors STATUS_RANK on the server. */
 export const STATUS_RANK: Record<AgentStatus, number> = {
   blocked: 0,

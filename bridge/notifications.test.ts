@@ -76,11 +76,18 @@ function agentNamed(paneId: string, name: string, status: AgentStatus): AgentVie
 }
 const agent = (paneId: string, status: AgentStatus) => agentNamed(paneId, "claude", status);
 
-function setup() {
+// `prefs` is a live, mutable object the injected `isNotifiable` reads on every call — so a test can
+// flip a preference and call `coord.applyPrefs()` to exercise the runtime-change path. Defaults to
+// both kinds enabled, matching the coordinator's old static {blocked,done} set (keeps the existing
+// debounce/coalesce/retract suites unchanged).
+function setup(prefs: { blocked: boolean; done: boolean } = { blocked: true, done: true }) {
   const clock = new FakeClock();
   const sink = new RecordingSink();
-  const coord = new NotificationCoordinator(clock, sink, 30_000);
-  return { clock, sink, coord };
+  const live = { ...prefs };
+  const isNotifiable = (s: AgentStatus): boolean =>
+    s === "blocked" ? live.blocked : s === "done" ? live.done : false;
+  const coord = new NotificationCoordinator(clock, sink, 30_000, isNotifiable);
+  return { clock, sink, coord, prefs: live };
 }
 
 describe("NotificationCoordinator — debounce", () => {
@@ -186,6 +193,64 @@ describe("NotificationCoordinator — retraction", () => {
     coord.onTransition(agent("p1", "idle"), "blocked", "idle");
     coord.onTransition(agent("p1", "working"), "idle", "working");
     expect(sink.clears).toBe(1);
+  });
+});
+
+describe("NotificationCoordinator — type preferences", () => {
+  test("with default prefs (done off), a done transition never pushes — even after the window", () => {
+    const { clock, sink, coord } = setup({ blocked: true, done: false });
+    coord.onTransition(agent("p1", "done"), "working", "done");
+    expect(clock.armed).toBe(0); // a disabled kind isn't even debounced
+    clock.fireAll();
+    expect(sink.events).toEqual([]);
+  });
+
+  test("with done enabled, a done transition pushes after the window", () => {
+    const { clock, sink, coord } = setup({ blocked: false, done: true });
+    coord.onTransition(agent("p1", "done"), "working", "done");
+    expect(sink.events).toEqual([]); // still debouncing
+    clock.fireAll();
+    expect(sink.last?.title).toBe("claude is done");
+  });
+
+  test("with blocked disabled, a blocked transition doesn't push", () => {
+    const { clock, sink, coord } = setup({ blocked: false, done: true });
+    coord.onTransition(agent("p1", "blocked"), "working", "blocked");
+    expect(clock.armed).toBe(0);
+    clock.fireAll();
+    expect(sink.events).toEqual([]);
+  });
+
+  test("disabling a kind at runtime retracts an already-outstanding alert of that kind", () => {
+    const { clock, sink, coord, prefs } = setup({ blocked: true, done: true });
+    coord.onTransition(agent("p1", "done"), "working", "done");
+    clock.fireAll();
+    expect(sink.last?.title).toBe("claude is done"); // delivered
+    prefs.done = false; // preference changes at runtime…
+    coord.applyPrefs(); // …and the API hook re-evaluates the herd
+    expect(sink.events.at(-1)).toEqual({ kind: "clear" }); // the done alert is retracted
+  });
+
+  test("disabling a kind at runtime cancels a still-pending alert of that kind", () => {
+    const { clock, sink, coord, prefs } = setup({ blocked: true, done: true });
+    coord.onTransition(agent("p1", "done"), "working", "done"); // debouncing, not yet delivered
+    expect(clock.armed).toBe(1);
+    prefs.done = false;
+    coord.applyPrefs();
+    expect(clock.armed).toBe(0); // timer cancelled
+    clock.fireAll();
+    expect(sink.events).toEqual([]); // nothing was ever shown
+  });
+
+  test("a blocked alert is retracted when the agent finishes and done-pushes are off", () => {
+    const { clock, sink, coord } = setup({ blocked: true, done: false });
+    coord.onTransition(agent("p1", "blocked"), "working", "blocked");
+    clock.fireAll();
+    expect(sink.last?.title).toBe("claude needs you");
+    // The agent completes, but done pushes are disabled — so this is a non-notifiable transition
+    // that resolves (retracts) the outstanding blocked alert rather than replacing it.
+    coord.onTransition(agent("p1", "done"), "blocked", "done");
+    expect(sink.events.at(-1)).toEqual({ kind: "clear" });
   });
 });
 

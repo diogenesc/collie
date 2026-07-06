@@ -6,10 +6,13 @@ import type {
   ActionResponse,
   BridgeConfig,
   CreateResponse,
+  NotifyPrefs,
   PaneReadResponse,
   SnapshotResponse,
   UploadResponse,
 } from "./types";
+
+export type { NotifyPrefs };
 
 class ApiError extends Error {
   readonly status: number;
@@ -205,6 +208,22 @@ export function setSnooze(snoozedUntil: number | null): Promise<{ snoozedUntil: 
   return req<{ snoozedUntil: number | null }>("/api/notifications/snooze", {
     method: "POST",
     body: JSON.stringify({ snoozedUntil }),
+  });
+}
+
+/** Fetch the bridge-wide notification-type preferences (which agent statuses push). */
+export function getNotifyPrefs(): Promise<NotifyPrefs> {
+  return req<NotifyPrefs>("/api/notifications/prefs");
+}
+
+/**
+ * Update the notification-type preferences with a partial patch (only the keys you send change).
+ * Bridge-wide — it affects every device, like the snooze. Returns the merged prefs.
+ */
+export function setNotifyPrefs(patch: Partial<NotifyPrefs>): Promise<NotifyPrefs> {
+  return req<NotifyPrefs>("/api/notifications/prefs", {
+    method: "POST",
+    body: JSON.stringify(patch),
   });
 }
 

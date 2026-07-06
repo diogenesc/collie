@@ -6,6 +6,7 @@ import type { Config } from "./config.ts";
 import type { HerdrClient, PaneRead } from "./herdr-client.ts";
 import { computeEtag, gzipJsonResponse, notModified } from "./http-cache.ts";
 import { NotificationCoordinator, makeNotifySink, type NotifyClock } from "./notifications.ts";
+import type { NotifyPrefs, NotifyPrefsStore } from "./notify-prefs.ts";
 import type { Push, PushSubscription } from "./push.ts";
 import type { Snooze } from "./snooze.ts";
 import type { StateEngine } from "./state-engine.ts";
@@ -86,9 +87,27 @@ export function startServer(opts: {
   engine: StateEngine;
   push: Push;
   snooze: Snooze;
+  notifyPrefs: NotifyPrefsStore;
   audit: AuditLog;
 }) {
-  const { cfg, herdr, engine, push, snooze, audit } = opts;
+  const { cfg, herdr, engine, push, snooze, notifyPrefs, audit } = opts;
+
+  // Background notifications on lifecycle transitions (foreground toasts are computed client-side by
+  // diffing snapshots). Push is independent of how the client polls. The coordinator debounces each
+  // blocked/done alert, honours the notify-type prefs, and retracts an alert once the agent resolves
+  // — so an agent you cleared at your desk never (or no longer) buzzes your phone. See notifications.ts.
+  // Built before Bun.serve so the /api/notifications/prefs route can drive its applyPrefs() hook.
+  const clock: NotifyClock<ReturnType<typeof setTimeout>> = {
+    schedule: (fn, ms) => setTimeout(fn, ms),
+    cancel: (h) => clearTimeout(h),
+  };
+  const sink = makeNotifySink(push, snooze, HERD_TAG);
+  const notifications = new NotificationCoordinator(clock, sink, cfg.notifyDelayMs, (status) =>
+    notifyPrefs.isNotifiable(status),
+  );
+  engine.onTransition((agent, from, to) => notifications.onTransition(agent, from, to));
+  engine.onRemove((paneId) => notifications.onRemove(paneId));
+
   const server = Bun.serve({
     hostname: cfg.host,
     port: cfg.port,
@@ -191,24 +210,37 @@ export function startServer(opts: {
         if (snooze.isMuted()) void push.send({ type: "clear", tag: HERD_TAG });
         return json({ snoozedUntil: snooze.until() }, req.headers.get("accept-encoding"));
       }
+      if (pathname === "/api/notifications/prefs") {
+        // Which agent statuses push (bridge-wide). Read-level like snooze — managing your own
+        // notification preferences isn't terminal-driving.
+        if (req.method === "GET") {
+          const denied = guard(req, cfg, "read");
+          if (denied) return denied;
+          return json(notifyPrefs.current(), req.headers.get("accept-encoding"));
+        }
+        if (req.method === "POST") {
+          const denied = guard(req, cfg, "read");
+          if (denied) return denied;
+          let body: unknown;
+          try {
+            body = await req.json();
+          } catch {
+            return text("bad request", 400);
+          }
+          const patch = parseNotifyPrefsPatch(body);
+          if (!patch) return text("bad prefs", 400);
+          const updated = await notifyPrefs.set(patch);
+          // Prefs may have just disabled a kind — retract any pending/outstanding alerts of it.
+          notifications.applyPrefs();
+          return json(updated, req.headers.get("accept-encoding"));
+        }
+        return text("method not allowed", 405);
+      }
 
       // ── Static PWA (with SPA fallback) ───────────────────────────────────
       return serveStatic(pathname);
     },
   });
-
-  // Background notifications on lifecycle transitions (foreground toasts are computed client-side
-  // by diffing snapshots). Push is independent of how the client polls. The coordinator debounces
-  // each blocked/done alert and retracts it once the agent resolves — so an agent you cleared at
-  // your desk never (or no longer) buzzes your phone. See notifications.ts.
-  const clock: NotifyClock<ReturnType<typeof setTimeout>> = {
-    schedule: (fn, ms) => setTimeout(fn, ms),
-    cancel: (h) => clearTimeout(h),
-  };
-  const sink = makeNotifySink(push, snooze, HERD_TAG);
-  const notifications = new NotificationCoordinator(clock, sink, cfg.notifyDelayMs);
-  engine.onTransition((agent, from, to) => notifications.onTransition(agent, from, to));
-  engine.onRemove((paneId) => notifications.onRemove(paneId));
 
   console.log(`[bridge] listening on http://${cfg.host}:${cfg.port}  (poll ${cfg.pollMs}ms)`);
   if (cfg.host !== "127.0.0.1" && cfg.host !== "localhost") {
@@ -677,6 +709,24 @@ function json(data: unknown, acceptEncoding: string | null): Response {
 
 function text(body: string, status: number): Response {
   return secure(new Response(body, { status }));
+}
+
+/**
+ * Validate an untrusted /api/notifications/prefs body into a partial patch. Only the known keys are
+ * considered and each, if present, must be a boolean — a non-boolean value is rejected (null return
+ * → 400). Unknown keys are ignored. An empty patch is valid (a no-op that echoes current prefs).
+ * Pure + exported so the validation is unit-testable without Bun.serve.
+ */
+export function parseNotifyPrefsPatch(v: unknown): Partial<NotifyPrefs> | null {
+  if (typeof v !== "object" || v === null) return null;
+  const o = v as Record<string, unknown>;
+  const patch: Partial<NotifyPrefs> = {};
+  for (const key of ["blocked", "done"] as const) {
+    if (!(key in o)) continue;
+    if (typeof o[key] !== "boolean") return null;
+    patch[key] = o[key] as boolean;
+  }
+  return patch;
 }
 
 // Shape-check an untrusted /api/subscribe body before persisting it (a malformed sub would be

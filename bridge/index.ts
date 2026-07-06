@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { AuditLog, fileAuditAppender } from "./audit.ts";
 import { loadConfig } from "./config.ts";
 import { HerdrClient } from "./herdr-client.ts";
+import { NotifyPrefsStore } from "./notify-prefs.ts";
 import { Push } from "./push.ts";
 import { startServer } from "./server.ts";
 import { Snooze } from "./snooze.ts";
@@ -33,6 +34,9 @@ await push.init();
 const snooze = new Snooze(cfg);
 await snooze.load();
 
+const notifyPrefs = new NotifyPrefsStore(cfg);
+await notifyPrefs.load();
+
 const engine = new StateEngine(herdr, cfg.pollMs);
 engine.start();
 
@@ -54,7 +58,7 @@ const sweepTimer = setInterval(() => {
 }, SWEEP_INTERVAL_MS);
 sweepTimer.unref();
 
-const server = startServer({ cfg, herdr, engine, push, snooze, audit });
+const server = startServer({ cfg, herdr, engine, push, snooze, notifyPrefs, audit });
 
 const shutdown = async () => {
   console.log("\n[bridge] shutting down");

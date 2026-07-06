@@ -16,7 +16,6 @@ import type { AgentStatus, AgentView } from "./types.ts";
 // Pure and clock-injected so `bun test` drives it without real timers: the bridge passes
 // setTimeout/clearTimeout (see server.ts); tests pass a fake clock they fire on demand.
 
-const NOTIFIABLE: ReadonlySet<AgentStatus> = new Set<AgentStatus>(["blocked", "done"]);
 type NotifiableStatus = "blocked" | "done";
 
 /** The timer primitive the coordinator schedules against — real setTimeout in the bridge, fake in tests. */
@@ -114,8 +113,8 @@ interface Alert {
 }
 
 export class NotificationCoordinator<H = unknown> {
-  /** paneId → timer for an alert that's debouncing but hasn't entered the summary yet. */
-  private readonly pending = new Map<string, H>();
+  /** paneId → debouncing alert (timer + its kind) that hasn't entered the summary yet. */
+  private readonly pending = new Map<string, { handle: H; status: NotifiableStatus }>();
   /** paneId → alert that has fired and is reflected in the current summary (insertion-ordered). */
   private readonly outstanding = new Map<string, Alert>();
 
@@ -123,13 +122,17 @@ export class NotificationCoordinator<H = unknown> {
     private readonly clock: NotifyClock<H>,
     private readonly sink: NotifySink,
     private readonly delayMs: number,
+    // Whether a transition into a status should notify, read live from the prefs store so a runtime
+    // change is honoured. A disabled kind behaves exactly like a non-notifiable status (idle/working).
+    private readonly isNotifiable: (status: AgentStatus) => boolean,
   ) {}
 
   /** Wire to `StateEngine.onTransition`. */
   onTransition(agent: AgentView, _from: AgentStatus, to: AgentStatus): void {
     const id = agent.paneId;
-    if (!NOTIFIABLE.has(to)) {
-      // Resolved to a non-notifiable state: drop a still-pending alert, retract a delivered one.
+    if (!this.isNotifiable(to)) {
+      // Resolved to a non-notifiable (or preference-disabled) state: drop a still-pending alert,
+      // retract a delivered one.
       this.resolve(id);
       return;
     }
@@ -146,12 +149,34 @@ export class NotificationCoordinator<H = unknown> {
       this.outstanding.set(id, alert);
       this.emit(true);
     }, this.delayMs);
-    this.pending.set(id, handle);
+    this.pending.set(id, { handle, status: alert.status });
   }
 
   /** Wire to `StateEngine.onRemove` — a vanished pane is implicitly resolved. */
   onRemove(paneId: string): void {
     this.resolve(paneId);
+  }
+
+  /**
+   * Re-evaluate every pending + outstanding alert against the current prefs after they change,
+   * dropping any whose kind is now disabled: cancel a still-debouncing timer, retract a delivered
+   * alert. Retractions re-emit the shrunk summary (or a clear) once, silently. Call after the prefs
+   * store is updated (see the /api/notifications/prefs route).
+   */
+  applyPrefs(): void {
+    // Drop pending timers for a now-disabled kind — nothing was shown yet, so no re-emit is needed.
+    for (const [id, p] of [...this.pending]) {
+      if (!this.isNotifiable(p.status)) this.cancelPending(id);
+    }
+    // Retract delivered alerts of a now-disabled kind; re-emit the shrunk summary once if any went.
+    let removed = false;
+    for (const [id, a] of [...this.outstanding]) {
+      if (!this.isNotifiable(a.status)) {
+        this.outstanding.delete(id);
+        removed = true;
+      }
+    }
+    if (removed) this.emit(false);
   }
 
   private resolve(id: string): void {
@@ -195,8 +220,9 @@ export class NotificationCoordinator<H = unknown> {
   }
 
   private cancelPending(id: string): void {
-    if (!this.pending.has(id)) return;
-    this.clock.cancel(this.pending.get(id)!);
+    const p = this.pending.get(id);
+    if (!p) return;
+    this.clock.cancel(p.handle);
     this.pending.delete(id);
   }
 }

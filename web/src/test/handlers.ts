@@ -118,4 +118,9 @@ export const handlers = [
     const { snoozedUntil } = (await request.json()) as { snoozedUntil: number | null };
     return HttpResponse.json({ snoozedUntil });
   }),
+  http.get("/api/notifications/prefs", () => HttpResponse.json({ blocked: true, done: false })),
+  http.post("/api/notifications/prefs", async ({ request }) => {
+    const patch = (await request.json()) as Record<string, boolean>;
+    return HttpResponse.json({ blocked: true, done: false, ...patch });
+  }),
 ];
