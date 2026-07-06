@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLoaderData, useLocation, useNavigate, useParams, useRouteLoaderData } from "react-router";
 
 import { AgentChat } from "@/components/agent-chat";
+import { useLoadingStalled } from "@/hooks/use-loading-stalled";
 import { useOnline } from "@/hooks/use-online";
 import { isConnecting } from "@/lib/connection";
 import { ROOT_ROUTE_ID, type HomeData, type PaneData } from "@/lib/loaders";
@@ -22,6 +23,7 @@ export function DetailRoute() {
   const navigate = useNavigate();
   const location = useLocation();
   const online = useOnline();
+  const stalled = useLoadingStalled();
 
   const fresh = (location.state as { freshPane?: AgentView } | null)?.freshPane;
   const inSnapshot =
@@ -71,7 +73,7 @@ export function DetailRoute() {
       requestedLines={pane.requestedLines}
       revision={pane.revision}
       device={root.device}
-      connecting={isConnecting({ online, bridge: root.bridge, error: root.error })}
+      connecting={isConnecting({ online, bridge: root.bridge, error: root.error, stalled })}
       onBack={() => navigateWithTransition(navigate, "/", "backward")}
       onSelect={(id) => navigateWithTransition(navigate, panePath(id), "none")}
     />

@@ -20,6 +20,40 @@ class ApiError extends Error {
   }
 }
 
+// Every request gets a deadline so a black-holed connection (phone sleep/wake, a Tailscale route
+// that goes dark) can't leave a fetch pending forever — which would zombify the app: the poller
+// gates on `revalidator.state === "idle"` and never fires again, and route navigations wait on a
+// loader that never settles. On timeout the fetch aborts with a DOMException named "TimeoutError";
+// the loaders rethrow ONLY "AbortError" (a superseded revalidation), so a timeout falls into their
+// catch → stale-data-with-error, and the poller/nav can retry. Budgets by request class:
+//   - GET reads (snapshot/pane polls) are small and frequent — a short leash surfaces a dead link
+//     fast so the UI can show "reconnecting…" and retry on the next tick.
+const GET_TIMEOUT_MS = 10_000;
+//   - Mutations drive a real terminal on the host, which can legitimately take a beat — more slack.
+const MUTATION_TIMEOUT_MS = 20_000;
+//   - Uploads carry a whole file over the phone's uplink — the most generous budget.
+const UPLOAD_TIMEOUT_MS = 60_000;
+
+/**
+ * Compose the caller's abort signal (a loader's `request.signal`, used to supersede a stale poll)
+ * with a fresh timeout signal, so a fetch aborts on EITHER cause. Returns the timeout signal alone
+ * when there's no caller signal. Runtime-guarded: on an older WebView missing `AbortSignal.timeout`
+ * or `AbortSignal.any` we return the caller's signal unchanged rather than crash — degrading to the
+ * old no-timeout behaviour instead of taking the app down.
+ *
+ * Exported for unit tests (the timeout wiring is otherwise unobservable).
+ */
+export function withTimeout(
+  signal: AbortSignal | null | undefined,
+  ms: number,
+): AbortSignal | undefined {
+  if (typeof AbortSignal.timeout !== "function") return signal ?? undefined;
+  const timeoutSignal = AbortSignal.timeout(ms);
+  if (!signal) return timeoutSignal;
+  if (typeof AbortSignal.any !== "function") return signal;
+  return AbortSignal.any([signal, timeoutSignal]);
+}
+
 // Best-effort human-readable failure detail: the response body if present, else the status text.
 async function errorDetail(res: Response): Promise<string> {
   try {
@@ -30,8 +64,12 @@ async function errorDetail(res: Response): Promise<string> {
 }
 
 async function doReq<T>(path: string, init?: RequestInit): Promise<T> {
+  // GET reads get the short leash; anything mutating gets the longer mutation budget.
+  const method = init?.method?.toUpperCase() ?? "GET";
+  const timeoutMs = method === "GET" ? GET_TIMEOUT_MS : MUTATION_TIMEOUT_MS;
   const res = await fetch(path, {
     ...init,
+    signal: withTimeout(init?.signal, timeoutMs),
     headers: { "content-type": "application/json", ...init?.headers },
   });
   if (!res.ok) {
@@ -85,7 +123,7 @@ export async function fetchPane(
   const headers: Record<string, string> = {};
   if (cached) headers["if-none-match"] = cached.etag;
 
-  const res = await fetch(url, { signal, headers });
+  const res = await fetch(url, { signal: withTimeout(signal, GET_TIMEOUT_MS), headers });
 
   if (res.status === 304 && cached) {
     // Unchanged — hand back the cached body (text included) so the mirror keeps its content.
@@ -183,6 +221,7 @@ export function uploadImage(paneId: string, file: File): Promise<UploadResponse>
       const res = await fetch(`/api/pane/${encodeURIComponent(paneId)}/upload`, {
         method: "POST",
         body: fd,
+        signal: withTimeout(undefined, UPLOAD_TIMEOUT_MS),
       });
       if (!res.ok) {
         throw new ApiError(`upload → ${res.status} ${await errorDetail(res)}`, res.status);

@@ -9,6 +9,10 @@ beforeEach(() => {
   vi.resetModules();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 const failSnapshot = () =>
   server.use(http.get("/api/snapshot", () => new HttpResponse(null, { status: 500 })));
 
@@ -75,6 +79,22 @@ describe("paneLoader", () => {
     expect(data.error).toBe(true);
     expect(data.text).toBe("");
     expect(data.paneId).toBe("wX:p9");
+  });
+
+  it("treats a TimeoutError from fetchPane as degraded (stale text + error), NOT a rethrow", async () => {
+    // A request that times out aborts with a DOMException named "TimeoutError" — distinct from the
+    // "AbortError" of a superseded revalidation. The loader rethrows only AbortError, so a timeout
+    // must fall into the stale-data branch (keep the last-good text on screen, flagged) and not
+    // bubble up as if the run were superseded.
+    const { paneLoader } = await import("./loaders");
+    await paneLoader({ params: { paneId: "w1:p1" } }); // prime the per-pane stale cache (via MSW)
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new DOMException("timed out", "TimeoutError"));
+    const stale = await paneLoader({ params: { paneId: "w1:p1" } });
+
+    expect(stale.error).toBe(true);
+    expect(stale.text).toBe("hello from the pane");
+    expect(stale.paneId).toBe("w1:p1");
   });
 
   it("throws on a missing :paneId param (fail-loud to the error boundary)", async () => {

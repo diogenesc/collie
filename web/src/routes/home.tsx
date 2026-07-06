@@ -11,6 +11,7 @@ import { TabStrip } from "@/components/tab-strip";
 import { NewSpaceSheet } from "@/components/new-space-sheet";
 import { StatusArea } from "@/components/status-area";
 import { BuildStamp } from "@/components/build-stamp";
+import { useLoadingStalled } from "@/hooks/use-loading-stalled";
 import { useOnline } from "@/hooks/use-online";
 import { useSpaceActions } from "@/hooks/use-spaces";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
@@ -24,6 +25,10 @@ import { navigateWithTransition, viewTransition } from "@/lib/view-transition";
 export function HomeRoute() {
   const data = useRouteLoaderData(ROOT_ROUTE_ID) as HomeData;
   const online = useOnline();
+  // A stalled load (a black-holed poll, or a pane-open tap whose navigation hangs) gallops the
+  // Collie mark within the threshold — instant feedback while you're still on the dashboard, even
+  // though the tap otherwise shows no visual change until its loader finally settles or times out.
+  const stalled = useLoadingStalled();
   const navigate = useNavigate();
   const location = useLocation();
   const { newTab, newSpace } = useSpaceActions();
@@ -46,7 +51,7 @@ export function HomeRoute() {
 
   return (
     <div className="mx-auto flex min-h-[100dvh] max-w-screen-sm flex-col">
-      <ConnectionBar online={online} bridge={data.bridge} error={data.error} onHome={toDashboard} />
+      <ConnectionBar online={online} bridge={data.bridge} error={data.error} stalled={stalled} onHome={toDashboard} />
       <ReadOnlyBanner device={data.device} />
 
       {selectedWs ? (

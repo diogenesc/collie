@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 
 import { server } from "@/test/setup";
-import { createTab, sendReply, uploadImage } from "./api";
+import { createTab, fetchPane, fetchSnapshot, sendReply, uploadImage, withTimeout } from "./api";
 
 // The default happy-path handlers live in test/handlers.ts; here we focus on the write paths and the
 // ApiError-on-non-2xx contract that every mutation depends on (and uploadImage's separate code path).
@@ -37,5 +37,70 @@ describe("api client", () => {
     );
     const file = new File(["x"], "x.png", { type: "image/png" });
     await expect(uploadImage("w1:p1", file)).rejects.toThrow(/413/);
+  });
+});
+
+// Every request carries a deadline so a black-holed connection can't leave a fetch pending forever.
+// GOTCHA: AbortSignal.timeout is NOT driven by Vitest fake timers in Node, so we don't try to
+// fast-forward a 10s budget. Instead we spy on AbortSignal.timeout to assert the RIGHT budget is
+// requested per endpoint class and that its signal reaches fetch, plus one real-timer test (tiny ms)
+// proving the produced signal actually aborts a pending op with a TimeoutError.
+describe("api client — request timeouts", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("applies GET_TIMEOUT_MS (10s) to snapshot and pane reads", async () => {
+    const spy = vi.spyOn(AbortSignal, "timeout");
+    await fetchSnapshot();
+    await fetchPane("w1:p1");
+    expect(spy).toHaveBeenCalledWith(10_000);
+    // Both are GET reads, so the only budget requested is the GET one.
+    expect(spy.mock.calls.every(([ms]) => ms === 10_000)).toBe(true);
+  });
+
+  it("applies MUTATION_TIMEOUT_MS (20s) to mutations", async () => {
+    const spy = vi.spyOn(AbortSignal, "timeout");
+    await sendReply("w1:p1", "hi");
+    expect(spy).toHaveBeenCalledWith(20_000);
+  });
+
+  it("applies UPLOAD_TIMEOUT_MS (60s) to image uploads", async () => {
+    server.use(
+      http.post(/\/api\/pane\/[^/]+\/upload$/, () => HttpResponse.json({ ok: true, path: "/x.png" })),
+    );
+    const spy = vi.spyOn(AbortSignal, "timeout");
+    await uploadImage("w1:p1", new File(["x"], "x.png", { type: "image/png" }));
+    expect(spy).toHaveBeenCalledWith(60_000);
+  });
+
+  it("passes the timeout signal through to fetch", async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    let captured: AbortSignal | null | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init?: RequestInit) => {
+      captured = init?.signal;
+      return new Response("{}", { status: 200 });
+    });
+    await fetchSnapshot();
+    const produced = timeoutSpy.mock.results[0]!.value as AbortSignal;
+    expect(captured).toBe(produced); // no caller signal → the timeout signal reaches fetch directly
+  });
+
+  it("composes the caller's signal with the timeout — a caller abort still surfaces as AbortError", async () => {
+    // AbortSignal.any means either cause can abort the fetch. A caller (React Router) abort keeps its
+    // "AbortError" name, which loaders rethrow as a superseded run — the timeout must not mask it.
+    const controller = new AbortController();
+    controller.abort();
+    await expect(fetchSnapshot(controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("withTimeout produces a signal that aborts a pending op with a TimeoutError (real timer)", async () => {
+    // Parameterised ms (20) keeps this on real timers and fast. Proves the wiring yields a
+    // "TimeoutError" (NOT "AbortError"), which is what makes loaders treat a timeout as degraded data.
+    const signal = withTimeout(undefined, 20);
+    expect(signal).toBeInstanceOf(AbortSignal);
+    await expect(
+      new Promise((_resolve, reject) => {
+        signal!.addEventListener("abort", () => reject(signal!.reason));
+      }),
+    ).rejects.toMatchObject({ name: "TimeoutError" });
   });
 });

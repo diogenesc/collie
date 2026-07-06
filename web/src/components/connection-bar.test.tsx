@@ -36,6 +36,11 @@ describe("ConnectionBar", () => {
     expect(screen.getByText("live")).toBeInTheDocument();
   });
 
+  it("shows 'reconnecting…' when a load has stalled (online + connected, no dedicated label)", () => {
+    renderBar(<ConnectionBar online bridge="connected" error={false} stalled />);
+    expect(screen.getByText("reconnecting…")).toBeInTheDocument();
+  });
+
   it("returns to the dashboard via onHome when the Collie wordmark is tapped", async () => {
     const onHome = vi.fn();
     renderBar(<ConnectionBar online bridge="connected" error={false} onHome={onHome} />);

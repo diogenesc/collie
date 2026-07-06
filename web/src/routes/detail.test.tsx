@@ -15,6 +15,10 @@ vi.mock("@/components/agent-chat", () => ({
   ),
 }));
 
+// The stall indicator has its own unit test; here it's noise (and would leave a pending timer), so
+// pin it idle.
+vi.mock("@/hooks/use-loading-stalled", () => ({ useLoadingStalled: () => false }));
+
 function agentView(paneId: string, kind: "agent" | "shell"): AgentView {
   return {
     paneId,

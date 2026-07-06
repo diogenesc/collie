@@ -11,6 +11,9 @@ interface ConnectionBarProps {
   online: boolean;
   bridge: BridgeStatus | undefined;
   error: boolean;
+  /** A load (revalidation or navigation) has stalled mid-flight — see useLoadingStalled. Optional
+   *  (defaults false) so this reads as a plain "reconnecting…" cause without a dedicated label. */
+  stalled?: boolean;
   /** Tapping the Collie wordmark returns to the dashboard. A callback, not a `<Link to="/">`: the
    *  dashboard and the drilled-in space view share the "/" route (drill-in is local state), so a
    *  same-route link would no-op while drilled in — the home route owns the reset. */
@@ -21,12 +24,14 @@ interface ConnectionBarProps {
 // does NOT reflect the per-poll fetch state — "live" stays put while we revalidate in the
 // background, so the indicator doesn't flicker between states on every tick.
 function resolve(props: ConnectionBarProps) {
-  const { online, bridge, error } = props;
+  const { online, bridge, error, stalled } = props;
   // `isConnecting` is the single source of truth for live-vs-not (shared with the in-pane loader);
   // resolve only picks which message/icon to show for the not-live cause.
   if (!isConnecting(props)) return { label: "live", tone: "ok", Icon: PlugZap } as const;
   if (!online) return { label: "offline", tone: "bad", Icon: WifiOff } as const;
-  if (error || bridge === undefined) return { label: "reconnecting…", tone: "warn", Icon: Plug } as const;
+  // A stall reads as "reconnecting…" too — same warn label, no new state: a fetch that hasn't
+  // settled is, from the user's seat, indistinguishable from a reconnect in progress.
+  if (error || bridge === undefined || stalled) return { label: "reconnecting…", tone: "warn", Icon: Plug } as const;
   return { label: "Herdr offline", tone: "warn", Icon: Plug } as const;
 }
 

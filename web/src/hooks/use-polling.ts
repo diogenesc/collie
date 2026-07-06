@@ -12,6 +12,15 @@ import type { HomeData } from "@/lib/loaders";
 const HOT_MS = 1500;
 const COLD_MS = 4000;
 
+// Self-heal a wedged revalidation. Normally a tick no-ops while one is already in flight (see the
+// idle fast-path below), but a black-holed fetch can stay `loading` forever (its timeout aside — the
+// timer itself can freeze while the phone sleeps). Once a revalidation has been loading for longer
+// than this — just past GET_TIMEOUT_MS (10s) as a belt-and-braces margin — a tick kicks a fresh
+// revalidate() anyway: React Router aborts/supersedes the hung one (loaders treat that AbortError as
+// "superseded"). We compare against wall-clock (Date.now), not a timer, precisely because timers can
+// stop advancing during sleep — the age we care about is real elapsed time since the load began.
+export const SUPERSEDE_MS = 12_000;
+
 /**
  * Pure cadence resolver — exported so it can be unit-tested in isolation.
  *
@@ -41,6 +50,16 @@ export function usePolling(data: HomeData | undefined, paneId?: string | null): 
   const ref = useRef(revalidator);
   ref.current = revalidator;
 
+  // Wall-clock timestamp of when the current revalidation began, or null when idle. Stamped on the
+  // idle→loading edge and cleared on →idle, so a tick can tell how long a load has been in flight
+  // (used to detect and supersede a wedged one). A ref, not state — it must not trigger re-renders.
+  const loadingSince = useRef<number | null>(null);
+  if (revalidator.state === "loading") {
+    if (loadingSince.current === null) loadingSince.current = Date.now();
+  } else {
+    loadingSince.current = null;
+  }
+
   const ms = intervalFor(data, paneId);
 
   useEffect(() => {
@@ -50,7 +69,15 @@ export function usePolling(data: HomeData | undefined, paneId?: string | null): 
       // during a clear network drop it's worthwhile. The `online` listener below kicks an
       // immediate revalidate on reconnect, so we never miss a beat when coming back online.
       if (!navigator.onLine) return;
-      if (ref.current.state === "idle") ref.current.revalidate();
+      const r = ref.current;
+      if (r.state === "idle") {
+        r.revalidate();
+        return;
+      }
+      // Already loading: normally we leave it be, but a revalidation stuck past SUPERSEDE_MS is
+      // almost certainly a black-holed fetch — kick a fresh one to supersede it and self-heal.
+      const since = loadingSince.current;
+      if (since !== null && Date.now() - since >= SUPERSEDE_MS) r.revalidate();
     };
     const id = window.setInterval(tick, ms);
     const onWake = () => tick();
