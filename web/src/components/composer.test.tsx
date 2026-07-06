@@ -38,7 +38,7 @@ describe("Composer — send", () => {
   it("sends non-destructive input on the first tap and clears the draft", async () => {
     const user = userEvent.setup();
     const props = renderComposer();
-    const box = screen.getByPlaceholderText(/type or dictate a reply/i);
+    const box = screen.getByPlaceholderText(/type a reply/i);
 
     await user.type(box, "looks good");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -52,7 +52,7 @@ describe("Composer — destructive-input confirm", () => {
   it("holds a destructive command for a second tap, then sends", async () => {
     const user = userEvent.setup();
     const props = renderComposer();
-    const box = screen.getByPlaceholderText(/type or dictate a reply/i);
+    const box = screen.getByPlaceholderText(/type a reply/i);
 
     await user.type(box, "rm -rf node_modules");
 
@@ -71,7 +71,7 @@ describe("Composer — destructive-input confirm", () => {
   it("does not arm the confirm for innocent input", async () => {
     const user = userEvent.setup();
     renderComposer();
-    const box = screen.getByPlaceholderText(/type or dictate a reply/i);
+    const box = screen.getByPlaceholderText(/type a reply/i);
 
     await user.type(box, "run the sudoku solver"); // "sudo" look-alike must not trip the guard
     await user.click(screen.getByRole("button", { name: "Send" }));

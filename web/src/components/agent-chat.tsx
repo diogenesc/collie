@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate, useRevalidator } from "react-router";
-import { ArrowUpToLine, Loader2, Search, TerminalSquare } from "lucide-react";
+import { ArrowUpToLine, Loader2, TerminalSquare } from "lucide-react";
 import { useSwipeUp } from "@/hooks/use-swipe";
 import { useSpaceActions } from "@/hooks/use-spaces";
 import { useDisplayPrefs } from "@/hooks/use-display-prefs";
 import { setStatus } from "@/lib/status";
-import { Button } from "@/components/ui/button";
 import { ChatMessageList, type ChatMessageListHandle } from "@/components/ui/chat/chat-message-list";
 import { BottomSheet } from "@/components/ui/sheet";
 import { CollieHome } from "@/components/collie-home";
@@ -67,11 +67,11 @@ type Drawer = "switcher" | null;
 // route loader (`text`); polling revalidates it. Replies/keys are confirmed via the header status
 // line (`setStatus`), then a revalidation pulls the fresh output.
 //
-// This shell owns the pane frame: the header (with find-in-output), the terminal mirror (freeze,
-// find highlighting, load-older scrollback), and navigation (the nav hub + swipe-up switcher). The
-// composer cluster — draft, send, keys, quick actions, slash-commands, image upload, display prefs —
-// lives in <Composer>; it reaches back here only to re-follow the tail after a send and to focus on
-// a mirror tap.
+// This shell owns the pane frame: the header (the find bar takes it over while find is open), the
+// terminal mirror (freeze, find highlighting, load-older scrollback), and navigation (the nav hub +
+// swipe-up switcher). The composer cluster — draft, send, keys, quick actions, slash-commands, image
+// upload, display prefs, and the find-in-output trigger — lives in <Composer>; it reaches back here
+// only to re-follow the tail after a send, focus on a mirror tap, and open find (which freezes the tail).
 export function AgentChat({
   paneId,
   agent,
@@ -366,10 +366,16 @@ export function AgentChat({
     navigateWithTransition(navigate, "/", "backward", { state: { space: workspaceId } });
   }
 
-  // Tapping the terminal mirror focuses the composer — but bail if the user is actually selecting
-  // text (a long-press selection), so copy works instead of the tap collapsing the selection and
-  // popping the keyboard.
-  function focusFromMirror() {
+  // Tapping the terminal mirror focuses the composer so you can start typing right away. Two bails:
+  //  - the tap landed on an interactive control INSIDE the mirror — a native prompt/wizard/preview
+  //    button, the Load-older button, or the note editor's own textarea. Their click bubbles up to
+  //    this handler, and focusing the composer here would pop the soft keyboard on every option tap
+  //    (and steal focus from the note editor). Only a tap on the raw terminal text should focus.
+  //  - the user is selecting text (a long-press selection), so copy works instead of the tap
+  //    collapsing the selection and popping the keyboard.
+  function focusFromMirror(e: ReactMouseEvent<HTMLDivElement>) {
+    const target = e.target as Element | null;
+    if (target?.closest?.("button, a, input, textarea, select, [role='textbox']")) return;
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed) return;
     composerRef.current?.focusInput();
@@ -403,7 +409,7 @@ export function AgentChat({
   return (
     <div className="flex h-[100dvh] flex-col">
       {/* Header — while find is open, the find bar takes over this row (one-handed, thumb-reachable). */}
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-background/85 px-2 py-2 backdrop-blur-md [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)] app-header">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-background/85 pl-4 pr-2 py-2 backdrop-blur-md [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)] app-header">
         {findOpen ? (
           <FindBar
             query={findQuery}
@@ -452,13 +458,6 @@ export function AgentChat({
               <div className="min-w-0 flex-1">
                 <span className="truncate font-semibold">(agent gone)</span>
               </div>
-            )}
-            {/* Find-in-output — search the already-fetched pane buffer without leaving the pane.
-                Shown only when there's output to search. */}
-            {display && (
-              <Button variant="ghost" size="icon" onClick={openFind} aria-label="Find in output">
-                <Search className="size-5" />
-              </Button>
             )}
             {/* The status pill is the live indicator — polling refreshes the mirror on its own, so
                 there's no manual refresh button. A bare shell shows a muted "shell" tag instead. */}
@@ -591,6 +590,9 @@ export function AgentChat({
           stepFontSize={stepFontSize}
           setRawTerminal={setRawTerminal}
           onSent={onSent}
+          // Find-in-output lives in the composer's View row now (the header was the wrong home for it).
+          // Enabled only when there's buffered output to search; opening it freezes the tail (openFind).
+          onOpenFind={display ? openFind : undefined}
         />
       </div>
 

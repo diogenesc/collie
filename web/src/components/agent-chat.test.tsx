@@ -53,7 +53,7 @@ describe("AgentChat — reply flow", () => {
   it("sends a typed reply and clears the composer on success", async () => {
     const user = userEvent.setup();
     renderChat();
-    const box = screen.getByPlaceholderText(/type or dictate a reply/i);
+    const box = screen.getByPlaceholderText(/type a reply/i);
 
     await user.type(box, "looks good");
     expect(box).toHaveValue("looks good");
@@ -71,7 +71,7 @@ describe("AgentChat — reply flow", () => {
     );
     const user = userEvent.setup();
     renderChat();
-    const box = screen.getByPlaceholderText(/type or dictate a reply/i);
+    const box = screen.getByPlaceholderText(/type a reply/i);
 
     await user.type(box, "retry this");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -146,7 +146,7 @@ describe("AgentChat — read-only device", () => {
   it("keeps the composer live for an authorised device", () => {
     renderChat({ device: { enforced: true, device: "my-phone", authorized: true } });
     expect(screen.queryByText(/read-only/i)).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/type or dictate a reply/i)).not.toBeDisabled();
+    expect(screen.getByPlaceholderText(/type a reply/i)).not.toBeDisabled();
   });
 });
 
@@ -357,5 +357,40 @@ describe("AgentChat — block-grammar scoping (Claude-only)", () => {
     expect(status.closest("pre")).not.toBeNull();
     // …and the input box itself is preserved verbatim (no chrome stripping for a non-Claude agent).
     expect(screen.getByText(/❯/)).toBeInTheDocument();
+  });
+});
+
+// Regression (user-reported on mobile): tapping a native prompt/wizard/preview option button popped
+// the phone keyboard. Those buttons live INSIDE the terminal-mirror div, whose onClick focuses the
+// composer (the "tap the mirror to start typing" affordance) — so an option tap bubbled up and
+// focused the input, opening the soft keyboard over the output. focusFromMirror must ignore taps
+// that land on an interactive control, while still focusing on a tap of the raw terminal text.
+describe("AgentChat — mirror tap must not pop the keyboard on option taps", () => {
+  const mockSubmit = vi.mocked(submitPromptOption);
+  beforeEach(() => {
+    mockSubmit.mockReset();
+    mockSubmit.mockResolvedValue({ status: "sent" });
+  });
+
+  it("does NOT focus the composer when a native prompt option is tapped", async () => {
+    const user = userEvent.setup();
+    renderChat({ text: MENU_TEXT });
+    const box = screen.getByPlaceholderText(/type a reply/i);
+    const yes = await screen.findByRole("button", { name: "Yes" });
+
+    await user.click(yes);
+    await waitFor(() => expect(mockSubmit).toHaveBeenCalledTimes(1));
+    // focusInput() is deferred (setTimeout 0); let any buggy queued focus fire before asserting.
+    await new Promise((r) => setTimeout(r, 20));
+    expect(box).not.toHaveFocus();
+  });
+
+  it("DOES still focus the composer when the raw mirror text is tapped", async () => {
+    const user = userEvent.setup();
+    renderChat({ text: "recent pane output" });
+    const box = screen.getByPlaceholderText(/type a reply/i);
+
+    await user.click(screen.getByText("recent pane output"));
+    await waitFor(() => expect(box).toHaveFocus());
   });
 });

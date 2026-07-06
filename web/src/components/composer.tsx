@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useRevalidator } from "react-router";
-import { AArrowDown, AArrowUp, Check, ImagePlus, Keyboard, Loader2, Send, Slash, Terminal, WrapText, Zap } from "lucide-react";
+import { AArrowDown, AArrowUp, Check, ImagePlus, Keyboard, Loader2, Search, Send, Slash, Terminal, WrapText, Zap } from "lucide-react";
 
 import { useKeyboardOpen } from "@/hooks/use-keyboard";
 import type { DisplayPrefs } from "@/hooks/use-display-prefs";
@@ -43,6 +43,9 @@ interface ComposerProps {
   setRawTerminal: (raw: boolean) => void;
   /** Snap the mirror to the live tail (follow + revalidate + scroll) after a successful send. */
   onSent: () => void;
+  /** Open find-in-output (freezes the tail in AgentChat). Undefined when there's no buffered output
+   * to search — the View-row Find button hides in that case. */
+  onOpenFind?: () => void;
 }
 
 // The composer cluster at the bottom of the pane view — everything a phone keyboard can't do on its
@@ -54,7 +57,7 @@ interface ComposerProps {
 type ComposerDrawer = "quick" | "cmd" | "keys" | null;
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { paneId, agent, isShell, gone, readOnly, text, prefs, setWrap, stepFontSize, setRawTerminal, onSent },
+  { paneId, agent, isShell, gone, readOnly, text, prefs, setWrap, stepFontSize, setRawTerminal, onSent, onOpenFind },
   ref,
 ) {
   const revalidator = useRevalidator();
@@ -311,6 +314,21 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         <div className="mb-2 flex items-center gap-1">
           <SectionLabel>View</SectionLabel>
           <div className="ml-auto flex items-center gap-1">
+            {/* Find in output — search the already-fetched pane buffer without leaving the pane.
+                Lives here (not the header) so search sits with the other view controls; only shown
+                when AgentChat passes a handler (i.e. there's buffered output to search). */}
+            {onOpenFind && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={onOpenFind}
+                aria-label="Find in output"
+                title="Find in output"
+              >
+                <Search className="size-3.5" />
+              </Button>
+            )}
             {/* Raw-terminal escape hatch: turns off the block renderer (native prompt buttons, chrome
                 strip, status strip) so a mis-parsed dialog can always be driven by hand with the keys
                 pad. Highlighted when active so it's obvious the plain mirror is showing. */}
@@ -420,7 +438,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                   ? "Read-only — device not authorised"
                   : isShell
                     ? "Type a shell command…"
-                    : "Type or dictate a reply…"
+                    : "Type a reply…"
             }
             disabled={locked}
             rows={1}
