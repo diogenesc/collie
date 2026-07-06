@@ -6,6 +6,19 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.6.0] - 2026-07-06
+
+### Added
+- First-paint PWA splash: the galloping collie shows before React mounts (299f632)
+- Keys sheet: `Ctrl` modifier + visible key queue — compose chords/sequences, review, Send as one call; dialer-size digits on a `123` tab (515f795)
+
+### Changed
+- Header Collie mark matches the agent logo (2rem, aligned across screens); Find lives in the composer View row; placeholder is just "Type a reply…" (11385ee)
+
+### Fixed
+- Option taps no longer pop the phone keyboard or steal the note editor's focus (11385ee)
+- Stalled connections no longer zombify the app: fetch timeouts (10s/20s/60s), polls supersede a wedged revalidation at 12s, and the collie gallops within 2.5s of a stalled load or pane-tap navigation (e6ad939)
+
 ## [0.5.0] - 2026-07-05
 
 ### Added

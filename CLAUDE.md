@@ -23,7 +23,9 @@ manifest) you MUST:
    - **MINOR** (`0.2.0 → 0.3.0`): new backward-compatible capability.
    - **MAJOR** (`0.2.0 → 1.0.0`): breaking change to config, API, or behavior.
 2. **Add a `CHANGELOG.md` entry** under a new `## [x.y.z] - YYYY-MM-DD` heading (Added / Changed /
-   Fixed). Use the real date.
+   Fixed). Use the real date. **Style: super crisp and short** — one line per change, no prose
+   paragraphs, and cite the feature's short commit hash at the end of the line (`… (abc1234)`).
+   Land features as their own commits first, then cut the release commit so the entry can cite them.
 3. **Run `scripts/check-version.sh`** — it must print `✓`.
 
 Doc-only changes (`*.md`) don't need a bump. This is enforced two ways, but **you are the first
