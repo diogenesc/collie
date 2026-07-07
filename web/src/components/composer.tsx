@@ -237,76 +237,58 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         )}
 
         {/* Quick keys — shown only while the composer is focused and the keyboard is actually up.
-            Row 1: navigation (← ↑ ↓ → Tab Esc ⏎ 📷) — drive selection menus while watching the
-            mirror; Row 2: digit shortcuts (1–5). All fire on pointer-down + preventDefault so the
-            textarea keeps focus and the soft keyboard stays up. Key names match the verified
-            HERDR_API.md grammar (Left/Right/Up/Down/Tab/Escape/Enter). */}
+            Mimics a physical keyboard's layout so muscle memory carries over: Esc top-left, Tab
+            directly below it, arrows as an inverted-T on the right (↑ over Enter's row, ← ↓ → below).
+            Digits live on the Keys sheet's 123 tab instead (keeps this strip to a fixed 2 rows, which
+            matters with the phone keyboard eating vertical space). All fire on pointer-down +
+            preventDefault so the textarea keeps focus and the soft keyboard stays up. Key names match
+            the verified HERDR_API.md grammar (Left/Right/Up/Down/Tab/Escape/Enter). */}
         {composerFocused && keyboardOpen && !locked && (
           <div className="mb-2 space-y-1">
-            {/* Row 1: navigation keys — arrows + Tab + Esc + Enter + image attach */}
-            <div className="grid grid-cols-8 gap-1">
-              {(
+            {(
+              [
                 [
-                  { label: "←", keys: ["Left"], aria: "Left" },
+                  { label: "Esc", keys: ["Escape"], aria: "Escape" },
+                  null,
                   { label: "↑", keys: ["Up"], aria: "Up" },
+                  { label: "⏎", keys: ["Enter"], aria: "Enter" },
+                ],
+                [
+                  { label: "Tab", keys: ["Tab"], aria: "Tab" },
+                  { label: "←", keys: ["Left"], aria: "Left" },
                   { label: "↓", keys: ["Down"], aria: "Down" },
                   { label: "→", keys: ["Right"], aria: "Right" },
-                  { label: "Tab", keys: ["Tab"], aria: "Tab" },
-                  { label: "Esc", keys: ["Escape"], aria: "Escape" },
-                  { label: "⏎", keys: ["Enter"], aria: "Enter" },
-                ] as const
-              ).map(({ label, keys, aria }) => (
-                <Button
-                  key={aria}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 px-0 text-xs font-medium"
-                  onPointerDown={(e) => e.preventDefault()}
-                  onClick={() => pressKeys([...keys])}
-                  aria-label={aria}
-                >
-                  {label}
-                </Button>
-              ))}
-              {/* Attach image — only while the keyboard is up (used rarely; grouped with the keys
-                  row rather than taking permanent space). preventDefault keeps the textarea focused
-                  so the row doesn't unmount before the picker opens. */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 px-0"
-                disabled={uploading}
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => fileRef.current?.click()}
-                aria-label="Attach image"
-              >
-                {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
-              </Button>
-            </div>
-            {/* Row 2: digit shortcuts for numbered agent menus */}
-            <div className="grid grid-cols-5 gap-1">
-              {["1", "2", "3", "4", "5"].map((d) => (
-                <Button
-                  key={d}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 px-0 font-mono text-sm"
-                  onPointerDown={(e) => e.preventDefault()}
-                  onClick={() => pressKeys([d])}
-                >
-                  {d}
-                </Button>
-              ))}
-            </div>
+                ],
+              ] as const
+            ).map((row, i) => (
+              <div key={i} className="grid grid-cols-4 gap-1">
+                {row.map((cell, j) =>
+                  cell ? (
+                    <Button
+                      key={cell.aria}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-0 text-xs font-medium"
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => pressKeys([...cell.keys])}
+                      aria-label={cell.aria}
+                    >
+                      {cell.label}
+                    </Button>
+                  ) : (
+                    <div key={j} aria-hidden />
+                  ),
+                )}
+              </div>
+            ))}
           </div>
         )}
 
         {/* File input stays mounted here (not inside the keyboard-only key row) so the picker
-            callback survives the keyboard collapsing. Attach-image fires it from the key row above;
-            structural commands (New tab/space, Kill) and Stop (Esc, in the Keys sheet) live elsewhere. */}
+            callback survives the keyboard collapsing. Attach-image fires it from the reply-input row
+            below (always visible, not gated behind the keyboard-open quick keys); structural commands
+            (New tab/space, Kill) and Stop (Esc, in the Keys sheet) live elsewhere. */}
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickImage} />
         {/* Display prefs (wrap + font size) on their own compact, right-aligned row. Kept off the
             Keys/Quick/Agent action row below — three extra buttons there overflowed a narrow phone
@@ -419,6 +401,21 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           )}
         </div>
         <div className="flex items-end gap-2">
+          {/* Attach image — messenger-style, left of the input, always available (previously buried
+              in the keyboard-only quick-key strip). preventDefault keeps the textarea focused so the
+              picker opens without the soft keyboard collapsing first. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full text-muted-foreground"
+            disabled={uploading || locked}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => fileRef.current?.click()}
+            aria-label="Attach image"
+          >
+            {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+          </Button>
           <ChatInput
             ref={inputRef}
             value={input}

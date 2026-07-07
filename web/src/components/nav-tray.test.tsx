@@ -42,6 +42,37 @@ describe("NavTray", () => {
     expect(onSend.mock.calls).toEqual([[["1"]], [["5"]], [["9"]]]);
   });
 
+  it("keys tab: Esc leads row 1, Tab leads row 2 (physical-keyboard geometry)", () => {
+    render(<NavTray onSend={vi.fn()} />);
+
+    const esc = screen.getByRole("button", { name: "Esc" });
+    const up = screen.getByRole("button", { name: "Up" });
+    const enter = screen.getByRole("button", { name: /Enter/ });
+    const tab = screen.getByRole("button", { name: "Tab" });
+    const left = screen.getByRole("button", { name: "Left" });
+    const down = screen.getByRole("button", { name: "Down" });
+    const right = screen.getByRole("button", { name: "Right" });
+    const space = screen.getByRole("button", { name: "Space" });
+
+    // a.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING !== 0 means a comes before b.
+    const isBefore = (a: HTMLElement, b: HTMLElement) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    // Esc is the very first key button — top-left of row 1, before ↑ and ⏎ (row 1) and Tab (row 2).
+    expect(isBefore(esc, up)).toBe(true);
+    expect(isBefore(esc, enter)).toBe(true);
+    expect(isBefore(esc, tab)).toBe(true);
+
+    // Tab begins row 2 — after all of row 1, before ← ↓ → which follow it in the same row.
+    expect(isBefore(enter, tab)).toBe(true);
+    expect(isBefore(tab, left)).toBe(true);
+    expect(isBefore(tab, down)).toBe(true);
+    expect(isBefore(tab, right)).toBe(true);
+
+    // Space sits below the two rows, on its own full-width row.
+    expect(isBefore(right, space)).toBe(true);
+  });
+
   it("does not fire anything when disabled", async () => {
     const user = userEvent.setup();
     const onSend = vi.fn();

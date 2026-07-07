@@ -147,21 +147,30 @@ export function NavTray({ onSend, disabled }: NavTrayProps) {
 
       {tab === "keys" ? (
         <>
-          {/* Navigate: arrows + Esc */}
-          <div className="grid grid-cols-5 gap-1.5">
-            {navBtn(<ArrowLeft className="mx-auto size-4" />, ["Left"], "Left")}
+          {/* Same physical-keyboard geometry as the composer's inline quick keys, for muscle memory:
+              Esc top-left, Tab directly below it, arrows as an inverted-T on the right. */}
+          <div className="grid grid-cols-4 gap-1.5">
+            {navBtn("Esc", ["Escape"])}
+            <div aria-hidden />
             {navBtn(<ArrowUp className="mx-auto size-4" />, ["Up"], "Up")}
+            {navBtn("⏎ Enter", ["Enter"])}
+            {navBtn("Tab", ["Tab"])}
+            {navBtn(<ArrowLeft className="mx-auto size-4" />, ["Left"], "Left")}
             {navBtn(<ArrowDown className="mx-auto size-4" />, ["Down"], "Down")}
             {navBtn(<ArrowRight className="mx-auto size-4" />, ["Right"], "Right")}
-            {navBtn("Esc", ["Escape"])}
           </div>
 
-          {/* Tab · Space · Enter */}
-          <div className="grid grid-cols-3 gap-1.5">
-            {navBtn("Tab", ["Tab"])}
-            {navBtn("Space", ["Space"])}
-            {navBtn("⏎ Enter", ["Enter"])}
-          </div>
+          {/* Space — full-width, spacebar-style, on its own row */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            onClick={() => fire(["Space"])}
+            className="h-10 w-full text-sm font-medium"
+          >
+            Space
+          </Button>
 
           {/* Modifiers (sticky, one-shot, radio): arm one and the next key composes as its chord.
               Same pressed styling as everything else (default = armed, outline = idle). */}

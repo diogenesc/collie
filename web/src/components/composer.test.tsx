@@ -81,3 +81,27 @@ describe("Composer — destructive-input confirm", () => {
     await waitFor(() => expect(box).toHaveValue(""));
   });
 });
+
+describe("Composer — quick keys / image attach", () => {
+  it("shows the attach button on the reply-input row without the quick-key strip being visible", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+
+    // The quick-key strip only renders once composerFocused && keyboardOpen — keyboardOpen defaults
+    // to false in jsdom (no visualViewport resize fires), so none of its keys are present here.
+    expect(screen.queryByRole("button", { name: "Esc" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tab" })).not.toBeInTheDocument();
+
+    // The attach button now lives on the always-visible reply-input row instead of the strip.
+    const attach = screen.getByRole("button", { name: "Attach image" });
+    expect(attach).toBeEnabled();
+    await user.click(attach); // clickable without throwing (opens the hidden file input)
+  });
+
+  it("does not render digit shortcut buttons in the composer (they live on the Keys sheet's 123 tab)", () => {
+    renderComposer();
+    for (const d of ["1", "2", "3", "4", "5"]) {
+      expect(screen.queryByRole("button", { name: d })).not.toBeInTheDocument();
+    }
+  });
+});
