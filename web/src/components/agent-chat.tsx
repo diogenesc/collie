@@ -416,7 +416,7 @@ export function AgentChat({
   return (
     <div className="flex h-[100dvh] flex-col">
       {/* Header — while find is open, the find bar takes over this row (one-handed, thumb-reachable). */}
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-background/85 pl-4 pr-2 py-2 backdrop-blur-md [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)] app-header">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-zinc-800 pl-4 pr-2 py-2 [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)] app-header">
         {findOpen ? (
           <FindBar
             query={findQuery}
