@@ -6,6 +6,11 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.10.4] - 2026-07-09
+
+### Changed
+- Faint translucent zinc disc behind the Collie header mark, lifting its silhouette off the dark header (45daa22)
+
 ## [0.10.3] - 2026-07-09
 
 ### Changed
