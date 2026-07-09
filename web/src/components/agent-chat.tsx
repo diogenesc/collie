@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate, useRevalidator } from "react-router";
-import { ArrowUpToLine, Layers, Loader2, TerminalSquare } from "lucide-react";
+import { ArrowUpToLine, Loader2, TerminalSquare } from "lucide-react";
 import { useSwipeUp } from "@/hooks/use-swipe";
 import { useSpaceActions } from "@/hooks/use-spaces";
 import { useDisplayPrefs } from "@/hooks/use-display-prefs";
@@ -23,7 +23,6 @@ import { PaneStrip } from "@/components/pane-strip";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
 import { StatusArea } from "@/components/status-area";
 import { ShellBadge, StatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui/badge";
 import * as api from "@/lib/api";
 import { submitPromptOption } from "@/lib/prompt-action";
 import { submitWizardKeys } from "@/lib/wizard-action";
@@ -468,14 +467,6 @@ export function AgentChat({
               <div className="min-w-0 flex-1">
                 <span className="truncate font-semibold">(agent gone)</span>
               </div>
-            )}
-            {/* Safety cue: on a non-primary session, name it right in the header so a reply/keystroke
-                is never mistaken for the primary herd. Omitted on the primary session (no `?s=`). */}
-            {session && (
-              <Badge variant="secondary" className="shrink-0 gap-1" title={`Session: ${session}`}>
-                <Layers className="size-3" />
-                <span className="max-w-[6rem] truncate">{session}</span>
-              </Badge>
             )}
             {/* The status pill is the live indicator — polling refreshes the mirror on its own, so
                 there's no manual refresh button. A bare shell shows a muted "shell" tag instead. */}
