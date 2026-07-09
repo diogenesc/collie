@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router";
 
 import { BootSplash, RootError, RootLayout } from "@/routes/root";
 import { HomeRoute } from "@/routes/home";
+import { SpaceRoute } from "@/routes/space";
 import { DetailRoute } from "@/routes/detail";
 import { SettingsRoute } from "@/routes/settings";
 import { rootLoader, paneLoader, ROOT_ROUTE_ID } from "@/lib/loaders";
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
     HydrateFallback: BootSplash,
     children: [
       { index: true, element: <HomeRoute /> },
+      { path: "space/:spaceId", element: <SpaceRoute /> },
       { path: "settings", element: <SettingsRoute /> },
       { path: "pane/:paneId", loader: paneLoader, element: <DetailRoute /> },
     ],

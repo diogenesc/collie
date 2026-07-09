@@ -31,7 +31,7 @@ import type { PreviewBlockAction } from "@/components/preview-select-block";
 import { canGrowRequestedLines, growRequestedLines } from "@/lib/loaders";
 import { shortCwd } from "@/lib/format";
 import { navigateWithTransition } from "@/lib/view-transition";
-import { homePath } from "@/lib/nav";
+import { spacePath } from "@/lib/nav";
 import { isReadOnly } from "@/lib/types";
 import type { AgentView, DeviceAuth, TabView } from "@/lib/types";
 import type { PreviewSelectModel, PromptModel, PromptOption, WizardModel } from "@/lib/blocks";
@@ -380,11 +380,11 @@ export function AgentChat({
     if (target) switchTo(target.paneId);
   }
 
-  // Open a space from the nav hub — go to its home view (its tabs + panes, incl. shells). A step
+  // Open a space from the nav hub — go to its detail route (its tabs + panes, incl. shells). A step
   // back up out of the pane, so it slides backward.
   function openSpace(workspaceId: string) {
     closeDrawer();
-    navigateWithTransition(navigate, homePath(session), "backward", { state: { space: workspaceId } });
+    navigateWithTransition(navigate, spacePath(workspaceId, session), "backward");
   }
 
   // Tapping the terminal mirror focuses the composer so you can start typing right away. Two bails:

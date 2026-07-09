@@ -7,6 +7,11 @@ export function panePath(paneId: string, session?: string): string {
   return `/pane/${encodeURIComponent(paneId)}${sessionSearch(session)}`;
 }
 
+/** A space's detail route (its tabs + panes). Deep-linkable; carries the session like panePath. */
+export function spacePath(spaceId: string, session?: string): string {
+  return `/space/${encodeURIComponent(spaceId)}${sessionSearch(session)}`;
+}
+
 /** The dashboard path, carrying the current session so "go home" doesn't drop you back to primary. */
 export function homePath(session?: string): string {
   return `/${sessionSearch(session)}`;
