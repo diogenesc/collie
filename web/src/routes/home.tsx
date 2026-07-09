@@ -39,7 +39,7 @@ export function HomeRoute() {
   const [tab, setTab] = useState<string | null>(null);
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
 
-  const open = (id: string) => navigateWithTransition(navigate, panePath(id), "forward");
+  const open = (id: string) => navigateWithTransition(navigate, panePath(id, data.session), "forward");
   // Drill into a space (forward), pop back to the dashboard (backward), or switch sibling space/tab
   // (lateral crossfade) — all are React-state swaps on this one route, so they animate via
   // viewTransition() rather than the router. The persistent header stays pinned (app-header group).
@@ -51,7 +51,15 @@ export function HomeRoute() {
 
   return (
     <div className="mx-auto flex min-h-[100dvh] max-w-screen-sm flex-col">
-      <ConnectionBar online={online} bridge={data.bridge} error={data.error} stalled={stalled} onHome={toDashboard} />
+      <ConnectionBar
+        online={online}
+        bridge={data.bridge}
+        error={data.error}
+        stalled={stalled}
+        onHome={toDashboard}
+        sessions={data.sessions}
+        session={data.session}
+      />
       <ReadOnlyBanner device={data.device} />
 
       {selectedWs ? (

@@ -54,4 +54,19 @@ describe("ConnectionBar", () => {
     expect(container.querySelector(".animate-spin")).toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
   });
+
+  it("omits ?s= from the Settings link on the primary session", () => {
+    renderBar(<ConnectionBar online bridge="connected" error={false} />);
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+  });
+
+  it("carries the current session into the Settings link", () => {
+    render(<ConnectionBar online bridge="connected" error={false} session="collie-demo" />, {
+      wrapper: ({ children }) => <MemoryRouter initialEntries={["/?s=collie-demo"]}>{children}</MemoryRouter>,
+    });
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/settings?s=collie-demo",
+    );
+  });
 });

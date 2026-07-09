@@ -77,7 +77,7 @@ async function handlePush(event: PushEvent): Promise<void> {
   // honoured by browsers that support notification action buttons (and both need a tag).
   const options: NotificationOptions & { renotify?: boolean; actions?: PushAction[] } = {
     body: decision.body,
-    data: { paneId: decision.paneId, quickReplies },
+    data: { paneId: decision.paneId, session: decision.session, quickReplies },
     icon: ICON,
     badge: ICON,
     tag: decision.tag,
@@ -89,7 +89,18 @@ async function handlePush(event: PushEvent): Promise<void> {
 
 interface NotifData {
   paneId?: string;
+  /** Registry name of the pane's session (undefined = primary) — deep-links + replies scope to it. */
+  session?: string;
   quickReplies?: string[];
+}
+
+// Session query builders, inlined so the SW bundle stays dependency-free (it imports only
+// push-decision). The browser URL uses `?s=`; the reply API uses `?session=`. Primary → no param.
+function sessionSearchParam(session?: string): string {
+  return session ? `?s=${encodeURIComponent(session)}` : "";
+}
+function sessionApiParam(session?: string): string {
+  return session ? `?session=${encodeURIComponent(session)}` : "";
 }
 
 // Tap a notification. A reply action button POSTs the reply straight from the SW (no app needed) and
@@ -102,24 +113,32 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
   if (replyIndex !== null && data.paneId) {
     const text = data.quickReplies?.[replyIndex];
     if (text) {
-      event.waitUntil(sendQuickReply(data.paneId, text, event.notification.tag));
+      event.waitUntil(sendQuickReply(data.paneId, text, event.notification.tag, data.session));
       return;
     }
     // The reply text vanished (shouldn't happen) — fall through to the deep-link.
   }
-  event.waitUntil(openPane(data.paneId));
+  event.waitUntil(openPane(data.paneId, data.session));
 });
 
 // POST a quick reply to the same endpoint the app uses (POST /api/pane/:id/reply {text, submit}).
 // Same-origin, so credentials/the trusted-user header ride along automatically. Confirm on success;
 // on failure raise an error notification whose tap opens the pane so the user can retry by hand.
-async function sendQuickReply(paneId: string, text: string, tag: string): Promise<void> {
+async function sendQuickReply(
+  paneId: string,
+  text: string,
+  tag: string,
+  session?: string,
+): Promise<void> {
   try {
-    const res = await fetch(`/api/pane/${encodeURIComponent(paneId)}/reply`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, submit: true }),
-    });
+    const res = await fetch(
+      `/api/pane/${encodeURIComponent(paneId)}/reply${sessionApiParam(session)}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, submit: true }),
+      },
+    );
     // The bridge answers 200 with { ok: boolean }; a non-2xx OR an { ok: false } body is a failure.
     let ok = res.ok;
     if (ok) {
@@ -131,7 +150,7 @@ async function sendQuickReply(paneId: string, text: string, tag: string): Promis
       }
     }
     if (!ok) {
-      await showReplyError(paneId, tag);
+      await showReplyError(paneId, tag, session);
       return;
     }
     // Silent confirmation reusing the slot (same tag) so it replaces the original alert, not stacks.
@@ -141,26 +160,28 @@ async function sendQuickReply(paneId: string, text: string, tag: string): Promis
       badge: ICON,
       tag,
       silent: true,
-      data: { paneId },
+      data: { paneId, session },
     });
   } catch {
-    await showReplyError(paneId, tag);
+    await showReplyError(paneId, tag, session);
   }
 }
 
-async function showReplyError(paneId: string, tag: string): Promise<void> {
+async function showReplyError(paneId: string, tag: string, session?: string): Promise<void> {
   await self.registration.showNotification("Reply failed — tap to open", {
     body: "Couldn't send. Open the pane to retry.",
     icon: ICON,
     badge: ICON,
     tag,
-    data: { paneId },
+    data: { paneId, session },
   });
 }
 
 // Focus an existing Collie tab (navigating it to the agent) or open a new one — the body-tap path.
-async function openPane(paneId: string | undefined): Promise<void> {
-  const path = paneId && paneId !== "test" ? `/pane/${encodeURIComponent(paneId)}` : "/";
+// The session rides along as `?s=` so the deep-link lands in the right herd (omitted for primary).
+async function openPane(paneId: string | undefined, session?: string): Promise<void> {
+  const base = paneId && paneId !== "test" ? `/pane/${encodeURIComponent(paneId)}` : "/";
+  const path = `${base}${sessionSearchParam(session)}`;
   const url = new URL(path, self.location.origin).href;
   const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
   for (const client of windows) {

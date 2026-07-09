@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate, useRevalidator } from "react-router";
-import { ArrowUpToLine, Loader2, TerminalSquare } from "lucide-react";
+import { ArrowUpToLine, Layers, Loader2, TerminalSquare } from "lucide-react";
 import { useSwipeUp } from "@/hooks/use-swipe";
 import { useSpaceActions } from "@/hooks/use-spaces";
 import { useDisplayPrefs } from "@/hooks/use-display-prefs";
@@ -23,6 +23,7 @@ import { PaneStrip } from "@/components/pane-strip";
 import { ReadOnlyBanner } from "@/components/read-only-banner";
 import { StatusArea } from "@/components/status-area";
 import { ShellBadge, StatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import * as api from "@/lib/api";
 import { submitPromptOption } from "@/lib/prompt-action";
 import { submitWizardKeys } from "@/lib/wizard-action";
@@ -31,12 +32,15 @@ import type { PreviewBlockAction } from "@/components/preview-select-block";
 import { canGrowRequestedLines, growRequestedLines } from "@/lib/loaders";
 import { shortCwd } from "@/lib/format";
 import { navigateWithTransition } from "@/lib/view-transition";
+import { homePath } from "@/lib/nav";
 import { isReadOnly } from "@/lib/types";
 import type { AgentView, DeviceAuth, TabView } from "@/lib/types";
 import type { PreviewSelectModel, PromptModel, PromptOption, WizardModel } from "@/lib/blocks";
 
 interface AgentChatProps {
   paneId: string;
+  /** The session this pane lives in (undefined = primary) — scopes every read/write + the safety chip. */
+  session?: string;
   agent: AgentView | undefined;
   agents: AgentView[];
   shellPanes: AgentView[];
@@ -74,6 +78,7 @@ type Drawer = "switcher" | null;
 // only to re-follow the tail after a send, focus on a mirror tap, and open find (which freezes the tail).
 export function AgentChat({
   paneId,
+  session,
   agent,
   agents,
   shellPanes,
@@ -189,12 +194,12 @@ export function AgentChat({
   const adoptTarget = useRef<number | null>(null); // the requestedLines a pending grow is waiting on
   const pendingRestore = useRef(false); // re-anchor scroll after the enlarged display paints
   function loadOlder() {
-    if (loadingOlder || !canGrowRequestedLines(paneId)) return;
+    if (loadingOlder || !canGrowRequestedLines(paneId, session)) return;
     const el = listRef.current?.getScrollElement();
     olderAnchor.current = el ? { height: el.scrollHeight, top: el.scrollTop } : null;
     setLoadingOlder(true);
     setFollowing(false); // stay put in history rather than snapping to the tail
-    adoptTarget.current = growRequestedLines(paneId);
+    adoptTarget.current = growRequestedLines(paneId, session);
     revalidator.revalidate();
   }
   // Adopt the enlarged buffer into the frozen display once the *grown* fetch lands — keyed on the
@@ -246,6 +251,7 @@ export function AgentChat({
       }
       const result = await submitPromptOption({
         paneId,
+        session,
         requestedLines,
         detectedRevision: shown.revision,
         prompt,
@@ -263,7 +269,7 @@ export function AgentChat({
         setStatus(result.error || "Send failed", "error");
       }
     },
-    [readOnly, paneId, requestedLines, shown.revision, revalidator],
+    [readOnly, paneId, session, requestedLines, shown.revision, revalidator],
   );
 
   // Tap a wizard control (an option digit, step navigation, or the review step's submit/cancel).
@@ -279,6 +285,7 @@ export function AgentChat({
       }
       const result = await submitWizardKeys({
         paneId,
+        session,
         requestedLines,
         detectedRevision: shown.revision,
         wizard,
@@ -296,7 +303,7 @@ export function AgentChat({
         setStatus(result.error || "Send failed", "error");
       }
     },
-    [readOnly, paneId, requestedLines, shown.revision, revalidator],
+    [readOnly, paneId, session, requestedLines, shown.revision, revalidator],
   );
 
   // Tap a preview-dialog control (an option, the note add/edit/remove, or the wizard step nav).
@@ -312,6 +319,7 @@ export function AgentChat({
       }
       const base = {
         paneId,
+        session,
         requestedLines,
         detectedRevision: shown.revision,
         preview,
@@ -338,7 +346,7 @@ export function AgentChat({
         revalidator.revalidate();
       }
     },
-    [readOnly, paneId, requestedLines, shown.revision, revalidator],
+    [readOnly, paneId, session, requestedLines, shown.revision, revalidator],
   );
 
   // NOTE: the composer is deliberately NOT auto-focused on open/switch — that would pop the Android
@@ -363,7 +371,7 @@ export function AgentChat({
   // back up out of the pane, so it slides backward.
   function openSpace(workspaceId: string) {
     closeDrawer();
-    navigateWithTransition(navigate, "/", "backward", { state: { space: workspaceId } });
+    navigateWithTransition(navigate, homePath(session), "backward", { state: { space: workspaceId } });
   }
 
   // Tapping the terminal mirror focuses the composer so you can start typing right away. Two bails:
@@ -392,7 +400,7 @@ export function AgentChat({
     }
     setClosingId(id);
     try {
-      const res = await api.closePane(id);
+      const res = await api.closePane(id, session);
       if (res.ok) {
         if (id === paneId) onBack();
         else revalidator.revalidate();
@@ -459,6 +467,14 @@ export function AgentChat({
                 <span className="truncate font-semibold">(agent gone)</span>
               </div>
             )}
+            {/* Safety cue: on a non-primary session, name it right in the header so a reply/keystroke
+                is never mistaken for the primary herd. Omitted on the primary session (no `?s=`). */}
+            {session && (
+              <Badge variant="secondary" className="shrink-0 gap-1" title={`Session: ${session}`}>
+                <Layers className="size-3" />
+                <span className="max-w-[6rem] truncate">{session}</span>
+              </Badge>
+            )}
             {/* The status pill is the live indicator — polling refreshes the mirror on its own, so
                 there's no manual refresh button. A bare shell shows a muted "shell" tag instead. */}
             {agent && (isShell ? <ShellBadge /> : <StatusBadge status={agent.status} />)}
@@ -509,7 +525,7 @@ export function AgentChat({
             <>
               {/* Load older scrollback — sits at the top of the buffer, so it's reached by scrolling
                   up. Shown while the buffer is still truncated (older lines exist) and below the cap. */}
-              {truncated && canGrowRequestedLines(paneId) && (
+              {truncated && canGrowRequestedLines(paneId, session) && (
                 <button
                   type="button"
                   onClick={loadOlder}
@@ -580,6 +596,7 @@ export function AgentChat({
         <Composer
           ref={composerRef}
           paneId={paneId}
+          session={session}
           agent={agent?.agent}
           isShell={isShell}
           gone={gone}

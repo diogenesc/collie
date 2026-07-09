@@ -25,6 +25,8 @@ export interface ComposerHandle {
 
 interface ComposerProps {
   paneId: string;
+  /** The session the pane lives in (undefined = primary) — scopes every write to the right Herdr. */
+  session?: string;
   /** The pane's agent name — drives the slash-command palette and the reply-vs-shell placeholder. */
   agent: string | undefined | null;
   /** True for a bare shell pane (tweaks the placeholder copy). */
@@ -57,7 +59,7 @@ interface ComposerProps {
 type ComposerDrawer = "quick" | "cmd" | "keys" | null;
 
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
-  { paneId, agent, isShell, gone, readOnly, text, prefs, setWrap, stepFontSize, setRawTerminal, onSent, onOpenFind },
+  { paneId, session, agent, isShell, gone, readOnly, text, prefs, setWrap, stepFontSize, setRawTerminal, onSent, onOpenFind },
   ref,
 ) {
   const revalidator = useRevalidator();
@@ -131,7 +133,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     if (!t || locked || sending) return;
     setSending(true);
     try {
-      const res = await api.sendReply(paneId, t, true);
+      const res = await api.sendReply(paneId, t, true, session);
       if (res.ok) {
         if (isDraft) setInput("");
         // ✓ flash on the send button + status line acknowledge the send immediately. The mirror only
@@ -184,7 +186,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   function pressKeys(k: string[]) {
     if (locked) return;
     api
-      .sendKeys(paneId, k)
+      .sendKeys(paneId, k, session)
       .then((res) => {
         if (!res.ok) setStatus(res.error ?? "Key send failed", "error");
         else scheduleKeyRevalidate();
@@ -206,7 +208,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     if (!file || locked) return;
     setUploading(true);
     try {
-      const res = await api.uploadImage(paneId, file);
+      const res = await api.uploadImage(paneId, file, session);
       if (res.ok) {
         const path = res.path;
         setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${path}` : path));

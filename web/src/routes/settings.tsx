@@ -13,12 +13,15 @@ import { fetchConfig } from "@/lib/api";
 import { navigateWithTransition } from "@/lib/view-transition";
 import { usePushControl } from "@/hooks/use-push";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
+import { homePath } from "@/lib/nav";
+import { useSession } from "@/lib/session";
 import type { PushAvailability } from "@/lib/push";
 
 // Settings page — currently just the push-notification toggle. Reachable from the home header gear.
 // Lives under the root route, so the snapshot polling/push-setup in RootLayout keeps running behind it.
 export function SettingsRoute() {
   const navigate = useNavigate();
+  const session = useSession();
   const { state, busy, setEnabled } = usePushControl();
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +58,7 @@ export function SettingsRoute() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigateWithTransition(navigate, "/", "backward")}
+          onClick={() => navigateWithTransition(navigate, homePath(session), "backward")}
           aria-label="Back"
         >
           <ArrowLeft className="size-5" />

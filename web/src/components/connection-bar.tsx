@@ -4,8 +4,10 @@ import { Link } from "react-router";
 import { cn } from "@/lib/utils";
 import { markNavDirection } from "@/lib/view-transition";
 import { isConnecting } from "@/lib/connection";
+import { sessionSearch } from "@/lib/session";
 import { CollieHome } from "@/components/collie-home";
-import type { BridgeStatus } from "@/lib/types";
+import { SessionSwitcher } from "@/components/session-switcher";
+import type { BridgeStatus, SessionSummary } from "@/lib/types";
 
 interface ConnectionBarProps {
   online: boolean;
@@ -18,6 +20,10 @@ interface ConnectionBarProps {
    *  dashboard and the drilled-in space view share the "/" route (drill-in is local state), so a
    *  same-route link would no-op while drilled in — the home route owns the reset. */
   onHome?: () => void;
+  /** The bridge's session registry — drives the switcher trigger (which self-hides on one session). */
+  sessions?: SessionSummary[];
+  /** The current session name (undefined = primary). */
+  session?: string;
 }
 
 // One-line truth about whether the data on screen is live, and why not if it isn't. Deliberately
@@ -50,12 +56,15 @@ export function ConnectionBar(props: ConnectionBarProps) {
     <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur-md [padding-top:calc(env(safe-area-inset-top)_+_0.75rem)] app-header">
       <CollieHome onHome={props.onHome} connecting={isConnecting(props)} wordmark />
       <div className="flex items-center gap-3">
+        {/* Session switcher — self-hides unless there's more than one reachable session (or you're
+            on a non-primary one), so a single-session install sees no change here. */}
+        <SessionSwitcher sessions={props.sessions ?? []} current={props.session} />
         <div className={cn("flex items-center gap-1.5 text-xs font-medium", TONE[tone])}>
           <Icon className="size-3.5" />
           <span>{label}</span>
         </div>
         <Link
-          to="/settings"
+          to={{ pathname: "/settings", search: sessionSearch(props.session) }}
           viewTransition
           onClick={() => markNavDirection("forward")}
           aria-label="Settings"
