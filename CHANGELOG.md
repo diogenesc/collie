@@ -6,6 +6,12 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.10.2] - 2026-07-09
+
+### Changed
+- Pane header no longer shows the session chip — session UI is dashboard-only, keeping the in-space header clean (ba56ba9)
+- Collie header mark framed with a whitesmoke ring so it reads as a deliberate badge on the dark header (ba56ba9)
+
 ## [0.10.1] - 2026-07-09
 
 ### Changed
