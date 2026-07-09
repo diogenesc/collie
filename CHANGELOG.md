@@ -6,6 +6,11 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.10.5] - 2026-07-09
+
+### Changed
+- Navigation chrome (header + footer nav) brightened to a solid zinc-800 surface, lifting it off the content (9da7195)
+
 ## [0.10.4] - 2026-07-09
 
 ### Changed
