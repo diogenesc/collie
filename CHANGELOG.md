@@ -6,6 +6,11 @@ All notable changes to Collie are recorded here. The format follows
 `version` in `herdr-plugin.toml`, `package.json`, and `web/package.json` (enforced by
 `scripts/check-version.sh`). See [`CLAUDE.md`](./CLAUDE.md) → *Versioning* for the bump policy.
 
+## [0.10.3] - 2026-07-09
+
+### Changed
+- Collie header ring is thinner and lighter, with more diameter so the mark has room to breathe (35db0e5)
+
 ## [0.10.2] - 2026-07-09
 
 ### Changed
