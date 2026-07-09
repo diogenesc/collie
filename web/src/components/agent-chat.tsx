@@ -12,7 +12,7 @@ import { CollieHome } from "@/components/collie-home";
 import { AnsiOutput } from "@/components/ansi-output";
 import { parseAnsi } from "@/lib/ansi";
 import { splitLines } from "@/lib/blocks";
-import { extractStatusLine } from "@/lib/grammar/chrome";
+import { extractInputDraft, extractStatusLine } from "@/lib/grammar/chrome";
 import { hasBlockGrammar } from "@/lib/grammar/agents";
 import { FindBar } from "@/components/find-bar";
 import { Composer, type ComposerHandle } from "@/components/composer";
@@ -153,6 +153,20 @@ export function AgentChat({
     () =>
       grammarsOn && hasBlockGrammar(agent?.agent)
         ? extractStatusLine(splitLines(parseAnsi(display)))
+        : null,
+    [display, agent?.agent, grammarsOn],
+  );
+
+  // A user draft stranded on the input box's "❯" line — a message queued while the agent was busy
+  // then recalled, which persists across turns. stripChrome peels the box off the mirror so it goes
+  // invisible, and (worse) pane.send_text appends to it, corrupting the next send. We surface it to
+  // the composer, which offers a one-tap "Edit here" recovery (clear the terminal line, adopt the
+  // text locally). Same parse source + same Claude-only gate as the statusline, so the two can't
+  // drift; null when raw-terminal is on, no box is at the tail, or the line is empty/a placeholder.
+  const terminalDraft = useMemo(
+    () =>
+      grammarsOn && hasBlockGrammar(agent?.agent)
+        ? extractInputDraft(splitLines(parseAnsi(display)))
         : null,
     [display, agent?.agent, grammarsOn],
   );
@@ -595,6 +609,7 @@ export function AgentChat({
           gone={gone}
           readOnly={readOnly}
           text={text}
+          terminalDraft={terminalDraft}
           prefs={prefs}
           setWrap={setWrap}
           stepFontSize={stepFontSize}
