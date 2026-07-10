@@ -30,7 +30,6 @@ import { submitPreviewKeys, submitPreviewNote, submitPreviewOption } from "@/lib
 import type { PreviewBlockAction } from "@/components/preview-select-block";
 import { canGrowRequestedLines, growRequestedLines } from "@/lib/loaders";
 import { shortCwd } from "@/lib/format";
-import { navigateWithTransition } from "@/lib/view-transition";
 import { spacePath } from "@/lib/nav";
 import { isReadOnly } from "@/lib/types";
 import type { AgentView, DeviceAuth, TabView } from "@/lib/types";
@@ -384,7 +383,7 @@ export function AgentChat({
   // back up out of the pane, so it slides backward.
   function openSpace(workspaceId: string) {
     closeDrawer();
-    navigateWithTransition(navigate, spacePath(workspaceId, session), "backward");
+    navigate(spacePath(workspaceId, session));
   }
 
   // Tapping the terminal mirror focuses the composer so you can start typing right away. Two bails:
@@ -430,7 +429,7 @@ export function AgentChat({
   return (
     <div className="flex h-[100dvh] flex-col">
       {/* Header — while find is open, the find bar takes over this row (one-handed, thumb-reachable). */}
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-zinc-800 pl-4 pr-2 py-2 [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)] app-header">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-zinc-800 pl-4 pr-2 py-2 [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)]">
         {findOpen ? (
           <FindBar
             query={findQuery}
@@ -489,10 +488,8 @@ export function AgentChat({
         )}
       </header>
 
-      {/* Content region below the header — owns the `page` view-transition snapshot so it slides
-          while the header stays pinned; the mirror inside is the scroller (see index.css → View
-          transitions). */}
-      <div className="vt-page flex min-h-0 flex-1 flex-col">
+      {/* Content region below the header — the mirror inside is the scroller. */}
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Read-only notice when this device isn't allowlisted (the composer below is disabled too). */}
         <ReadOnlyBanner device={device} />
 

@@ -4,7 +4,6 @@ import { useNavigate, useRevalidator, useRouteLoaderData } from "react-router";
 import * as api from "@/lib/api";
 import { setStatus } from "@/lib/status";
 import { panePath } from "@/lib/nav";
-import { navigateWithTransition } from "@/lib/view-transition";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
 import { isReadOnly, type AgentView, type CreateResponse } from "@/lib/types";
 
@@ -53,9 +52,7 @@ export function useSpaceActions() {
       };
       setStatus(`New ${what} ready — launch your agent`, "success");
       revalidatorRef.current.revalidate();
-      navigateWithTransition(navigate, panePath(p.paneId, sessionRef.current), "forward", {
-        state: { freshPane: fresh },
-      });
+      navigate(panePath(p.paneId, sessionRef.current), { state: { freshPane: fresh } });
     },
     [navigate],
   );

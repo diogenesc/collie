@@ -10,7 +10,6 @@ import { NotifyPrefsControl } from "@/components/notify-prefs-control";
 import { SnoozeControl } from "@/components/snooze-control";
 import { Switch } from "@/components/ui/switch";
 import { fetchConfig } from "@/lib/api";
-import { navigateWithTransition } from "@/lib/view-transition";
 import { usePushControl } from "@/hooks/use-push";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
 import { homePath } from "@/lib/nav";
@@ -54,11 +53,11 @@ export function SettingsRoute() {
 
   return (
     <div className="mx-auto flex h-[100dvh] max-w-screen-sm flex-col">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-background/85 px-2 py-2 backdrop-blur-md [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)] app-header">
+      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-background/85 px-2 py-2 backdrop-blur-md [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)]">
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigateWithTransition(navigate, homePath(session), "backward")}
+          onClick={() => navigate(homePath(session))}
           aria-label="Back"
         >
           <ArrowLeft className="size-5" />
@@ -66,7 +65,7 @@ export function SettingsRoute() {
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
       </header>
 
-      <main className="vt-page flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-4">
+      <main className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-4">
         <Card className="gap-0 py-0">
           <div className="flex items-center justify-between gap-4 p-4">
             <div className="flex min-w-0 items-start gap-3">

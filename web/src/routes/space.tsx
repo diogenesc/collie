@@ -14,13 +14,11 @@ import { useOnline } from "@/hooks/use-online";
 import { useSpaceActions } from "@/hooks/use-spaces";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
 import { homePath, panePath, spacePath } from "@/lib/nav";
-import { navigateWithTransition, viewTransition } from "@/lib/view-transition";
 import { setStatus } from "@/lib/status";
 
 // Space detail route: one space's tabs + panes, with the space/tab strips for in-space navigation.
 // Shares the root snapshot (no own loader), reading :spaceId from the URL — a deep-linkable,
-// back-button-friendly drill-in. The SpaceStrip's "All" chip returns to the dashboard. The header
-// stays pinned across the slide (app-header group); the content region is the `.vt-page` scroller.
+// back-button-friendly drill-in. The SpaceStrip's "All" chip returns to the dashboard.
 export function SpaceRoute() {
   const data = useRouteLoaderData(ROOT_ROUTE_ID) as HomeData;
   const { spaceId = "" } = useParams();
@@ -43,10 +41,10 @@ export function SpaceRoute() {
 
   const selectedWs = data.workspaces.find((w) => w.workspaceId === spaceId);
 
-  const toDashboard = () => navigateWithTransition(navigate, homePath(data.session), "backward");
-  const switchSpace = (id: string) => navigateWithTransition(navigate, spacePath(id, data.session), "none");
-  const switchTab = (id: string | null) => viewTransition("none", () => setTab(id));
-  const open = (id: string) => navigateWithTransition(navigate, panePath(id, data.session), "forward");
+  const toDashboard = () => navigate(homePath(data.session));
+  const switchSpace = (id: string) => navigate(spacePath(id, data.session));
+  const switchTab = (id: string | null) => setTab(id);
+  const open = (id: string) => navigate(panePath(id, data.session));
 
   // Recover from a deleted space: once a healthy snapshot no longer has it, bounce to the dashboard
   // instead of leaving you on an empty shell. Guarded on a connected, non-stale snapshot so a
@@ -61,7 +59,7 @@ export function SpaceRoute() {
   useEffect(() => {
     if (gone && data.bridge === "connected" && !data.error) {
       setStatus(everExisted.current ? "Space closed" : "Space not found", "info");
-      navigateWithTransition(navigate, homePath(data.session), "backward", { replace: true });
+      navigate(homePath(data.session), { replace: true });
     }
   }, [gone, data.bridge, data.error, data.session, navigate]);
 
@@ -78,9 +76,8 @@ export function SpaceRoute() {
         showSessionSwitcher={false}
       />
 
-      {/* Content region below the header: the viewport-clipped `.vt-page` scroller that owns the
-          slide snapshot (see index.css → View transitions). */}
-      <div className="vt-page flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* Content region below the header: the viewport-clipped scroller. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <ReadOnlyBanner device={data.device} />
 
         {selectedWs && (

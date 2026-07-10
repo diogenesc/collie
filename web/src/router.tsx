@@ -7,6 +7,19 @@ import { DetailRoute } from "@/routes/detail";
 import { SettingsRoute } from "@/routes/settings";
 import { rootLoader, paneLoader, ROOT_ROUTE_ID } from "@/lib/loaders";
 
+// We don't use view transitions. React Router persists an "applied view transitions" map to
+// sessionStorage ("remix-router-transitions") and replays a phantom same-location transition on every
+// revalidation for any path it once saw a `viewTransition: true` navigation from. A device that ran an
+// older Collie build (which did use them) can carry a stale entry that fires
+// document.startViewTransition on every poll. Clear it on boot — our code never repopulates it. The
+// `:root { view-transition-name: none }` in index.css is the belt to this: even a stray transition
+// then captures nothing, so there's no visible flicker regardless of this key's name.
+try {
+  sessionStorage.removeItem("remix-router-transitions");
+} catch {
+  // sessionStorage access can throw in locked-down / private contexts — ignore.
+}
+
 // Created once at module scope so the idle-lock in App can unmount/remount RouterProvider without
 // losing the current location (the router instance retains it; loaders re-run fresh on remount).
 export const router = createBrowserRouter([

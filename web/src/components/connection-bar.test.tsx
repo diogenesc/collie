@@ -73,8 +73,7 @@ describe("ConnectionBar", () => {
 
   it("navigates to /settings with no ?s= on the primary session", async () => {
     renderBarAt(<ConnectionBar online bridge="connected" error={false} />, ["/"]);
-    // Imperative nav (arms the view-transition gate so Settings slides like the rest of the app) —
-    // assert it still lands on the right, session-scoped path.
+    // Imperative nav — assert it lands on the right, session-scoped path.
     await userEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByTestId("loc").textContent).toBe("/settings");
   });

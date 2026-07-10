@@ -2,7 +2,6 @@ import { Plug, PlugZap, Settings, WifiOff } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
-import { navigateWithTransition } from "@/lib/view-transition";
 import { isConnecting } from "@/lib/connection";
 import { settingsPath } from "@/lib/nav";
 import { CollieHome } from "@/components/collie-home";
@@ -57,7 +56,7 @@ export function ConnectionBar(props: ConnectionBarProps) {
   // connecting, reconnecting, or offline — and rests once the data on screen is live. The same
   // CollieHome renders inside a pane, so the top-left mark means the same thing on every screen.
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border/60 bg-zinc-800 px-4 py-2 [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)] app-header">
+    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border/60 bg-zinc-800 px-4 py-2 [padding-top:calc(env(safe-area-inset-top)_+_0.5rem)]">
       <CollieHome onHome={props.onHome} connecting={isConnecting(props)} wordmark />
       <div className="flex items-center gap-3">
         {/* Session switcher — dashboard-only (hidden when drilled into a space). Also self-hides
@@ -70,12 +69,10 @@ export function ConnectionBar(props: ConnectionBarProps) {
           <Icon className="size-3.5" />
           <span>{label}</span>
         </div>
-        {/* Imperative nav so Settings animates like the rest of the app: the view-transition gate
-            (lib/view-transition.ts) only animates transitions WE arm, so a declarative
-            <Link viewTransition> would swap without the forward slide. navigateWithTransition arms it. */}
+        {/* Settings gear. */}
         <button
           type="button"
-          onClick={() => navigateWithTransition(navigate, settingsPath(props.session), "forward")}
+          onClick={() => navigate(settingsPath(props.session))}
           aria-label="Settings"
           className="text-muted-foreground transition-colors hover:text-foreground"
         >

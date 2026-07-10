@@ -6,7 +6,6 @@ import { Check, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BottomSheet } from "@/components/ui/sheet";
 import { homePath } from "@/lib/nav";
-import { navigateWithTransition } from "@/lib/view-transition";
 import type { SessionSummary } from "@/lib/types";
 
 interface SessionSwitcherProps {
@@ -39,7 +38,7 @@ export function SessionSwitcher({ sessions, current }: SessionSwitcherProps) {
     if (!s.reachable) return; // unreachable rows are non-clickable (disabled), guard anyway
     const target = s.isPrimary ? undefined : s.name; // primary carries no `?s=`
     if (target === current) return; // already here
-    navigateWithTransition(navigate, homePath(target), "none");
+    navigate(homePath(target));
   }
 
   return (

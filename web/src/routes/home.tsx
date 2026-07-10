@@ -11,13 +11,19 @@ import { BuildStamp } from "@/components/build-stamp";
 import { useLoadingStalled } from "@/hooks/use-loading-stalled";
 import { useOnline } from "@/hooks/use-online";
 import { useSpaceActions } from "@/hooks/use-spaces";
+import { AGENT_GROUPS } from "@/lib/agent-groups";
 import { ROOT_ROUTE_ID, type HomeData } from "@/lib/loaders";
 import { panePath, spacePath } from "@/lib/nav";
-import { navigateWithTransition } from "@/lib/view-transition";
 
-// Dashboard home screen. Reads the herd from the root loader. A Spaces overview (each space with its
-// tab/pane counts and worst-agent status) over the agent triage (Needs you / Working / Idle · done):
-// tapping an agent opens its pane, tapping a space drills into its detail route (/space/:id).
+// "Needs you" is the urgent triage (accented group); hoist it above everything else. The rest of the
+// triage (working / idle · done) renders below the spaces overview.
+const ATTENTION_GROUPS = AGENT_GROUPS.filter((g) => g.accent);
+const REST_GROUPS = AGENT_GROUPS.filter((g) => !g.accent);
+
+// Dashboard home screen. Reads the herd from the root loader. "Needs you" sits at the very top (the
+// most important thing to act on), then the Spaces overview (each space with its tab/pane counts and
+// worst-agent status), then the rest of the agent triage: tapping an agent opens its pane, tapping a
+// space drills into its detail route (/space/:id).
 export function HomeRoute() {
   const data = useRouteLoaderData(ROOT_ROUTE_ID) as HomeData;
   const online = useOnline();
@@ -29,8 +35,8 @@ export function HomeRoute() {
   const { newSpace } = useSpaceActions();
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
 
-  const open = (id: string) => navigateWithTransition(navigate, panePath(id, data.session), "forward");
-  const drillInto = (id: string) => navigateWithTransition(navigate, spacePath(id, data.session), "forward");
+  const open = (id: string) => navigate(panePath(id, data.session));
+  const drillInto = (id: string) => navigate(spacePath(id, data.session));
 
   return (
     <div className="mx-auto flex h-[100dvh] max-w-screen-sm flex-col">
@@ -43,22 +49,27 @@ export function HomeRoute() {
         session={data.session}
       />
 
-      {/* Content region below the header: a viewport-clipped internal scroller that owns the `page`
-          view-transition snapshot. Because it captures its visible box (not the full document
-          height), a slide shows exactly what's on screen, and the sticky header stays out of the
-          animation entirely (see index.css → View transitions). */}
-      <div className="vt-page flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* Content region below the header: a viewport-clipped internal scroller. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <ReadOnlyBanner device={data.device} />
 
-        {/* Dashboard: spaces (with tab/pane counts) on top, the agent triage below. */}
         <main className="flex-1">
+          {/* Needs-you first — the most urgent triage, hoisted above the spaces overview. Renders
+              nothing when no agent is blocked (emptyState off, so the placeholder shows only once
+              below). */}
+          <AgentList
+            agents={data.agents}
+            onOpen={open}
+            groups={ATTENTION_GROUPS}
+            emptyState={false}
+          />
           <SpaceOverview
             workspaces={data.workspaces}
             agents={data.agents}
             onOpen={drillInto}
             onNewSpace={() => setNewSpaceOpen(true)}
           />
-          <AgentList agents={data.agents} bridge={data.bridge} onOpen={open} />
+          <AgentList agents={data.agents} bridge={data.bridge} onOpen={open} groups={REST_GROUPS} />
         </main>
 
         {/* Build stamp: which bundle you're running, with a stale-cache nudge. */}

@@ -7,7 +7,6 @@ import { useOnline } from "@/hooks/use-online";
 import { isConnecting } from "@/lib/connection";
 import { ROOT_ROUTE_ID, type HomeData, type PaneData } from "@/lib/loaders";
 import { homePath, panePath } from "@/lib/nav";
-import { navigateWithTransition } from "@/lib/view-transition";
 import { setStatus } from "@/lib/status";
 import type { AgentView } from "@/lib/types";
 
@@ -58,7 +57,7 @@ export function DetailRoute() {
   useEffect(() => {
     if (gone && root.bridge === "connected" && !root.error) {
       setStatus("Pane closed", "info");
-      navigateWithTransition(navigate, homePath(session), "backward", { replace: true });
+      navigate(homePath(session), { replace: true });
     }
   }, [gone, root.bridge, root.error, navigate, session]);
 
@@ -78,8 +77,8 @@ export function DetailRoute() {
       revision={pane.revision}
       device={root.device}
       connecting={isConnecting({ online, bridge: root.bridge, error: root.error, stalled })}
-      onBack={() => navigateWithTransition(navigate, homePath(session), "backward")}
-      onSelect={(id) => navigateWithTransition(navigate, panePath(id, session), "none")}
+      onBack={() => navigate(homePath(session))}
+      onSelect={(id) => navigate(panePath(id, session))}
     />
   );
 }
