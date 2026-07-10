@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useRouteLoaderData } from "react-router";
 
 import { ConnectionBar } from "@/components/connection-bar";
@@ -52,10 +52,15 @@ export function SpaceRoute() {
   // instead of leaving you on an empty shell. Guarded on a connected, non-stale snapshot so a
   // transient poll failure or a reconnect (or an idle-lock remount where the space died while locked)
   // doesn't evict a still-valid one. Mirrors DetailRoute's closed-pane recovery.
+  // Tell "closed under you" apart from "deep-link that never resolved": track whether we ever saw
+  // this space (ref write during render is idempotent — same pattern as the tab reset above). "Space
+  // closed" would misdescribe /space/<bad-id>, which was never open.
   const gone = !selectedWs;
+  const everExisted = useRef(false);
+  if (selectedWs) everExisted.current = true;
   useEffect(() => {
     if (gone && data.bridge === "connected" && !data.error) {
-      setStatus("Space closed", "info");
+      setStatus(everExisted.current ? "Space closed" : "Space not found", "info");
       navigateWithTransition(navigate, homePath(data.session), "backward", { replace: true });
     }
   }, [gone, data.bridge, data.error, data.session, navigate]);
