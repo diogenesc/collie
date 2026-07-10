@@ -31,11 +31,7 @@ serving a Vite + React + shadcn PWA.
 
 ## Demo
 
-<p align="center">
-  <video src="assets/2026-07-10-collie-demo.mp4" controls width="720">
-    <a href="assets/2026-07-10-collie-demo.mp4">▶ Watch the Collie demo (43s)</a>
-  </video>
-</p>
+https://github.com/user-attachments/assets/6334eab2-d503-4cfe-b770-80c4517e9482
 
 A run through the herd from a phone: the dashboard floats the agent that **needs you** to the top,
 you drill into a space's tabs and panes, switch between herds, and pick up a push notification the
